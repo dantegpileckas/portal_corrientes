@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal de Relevamiento | Provincia de Corrientes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- ========== SUPABASE SDK ========== -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // ─── Configuración de Supabase ────────────────────────────────
+  // Pegá tu Project URL y anon key desde supabase.com > Settings > API
+  const SUPABASE_URL = 'https://bmrydruplxjrqbpqpzje.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtcnlkcnVwbHhqcnFicHFwemplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0ODY4MDAsImV4cCI6MjA5ODA2MjgwMH0.TyyaGuCOsq70jB81yYPjDUP0USzew9OYIxEt-gijOdo';
+
+  const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const SB_CONFIGURED = !SUPABASE_URL.includes('TU_PROYECTO');
+
+  // Helper: mostrar errores Supabase como toast
+  function sbError(err, contexto) {
+    console.error(`[Supabase] ${contexto}:`, err);
+    showToast(`⚠️ Error al ${contexto}: ${err.message}`, 'warning');
+  }
+
+  // ─── Columnas del formulario ─────────────────────────────────
+  const CAMPOS_TRAMITE = [
+    'nombre','organismo','categoria','tipo','momento','prioridad',
+    'estado','temporalidad','fecha','responsable','descripcion',
+    'dirigido','requisitos','pasos','costos','donde','cta','notas'
+  ];
+</script>
+<style>
+  :root {
+    --verde: #0ea75d;
+    --verde-dark: #0b8a4c;
+    --verde-light: #e8f8f0;
+    --amarillo: #faaa00;
+    --amarillo-light: #fff8e6;
+    --rojo: #ef4444;
+    --rojo-light: #fef2f2;
+    --slate: #0f172a;
+    --slate-mid: #475569;
+    --bg: #f1f5f9;
+    --white: #ffffff;
+    --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--slate); }
+  h1,h2,h3,h4,h5 { font-family: 'Poppins', sans-serif; }
+
+  /* Tabs */
+  .tab-btn { transition: all 0.2s; border-bottom: 3px solid transparent; }
+  .tab-btn.active { border-bottom-color: var(--verde); color: var(--verde); background: white; }
+  .tab-btn:not(.active):hover { background: #f8fafc; color: var(--verde); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Badges */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-green { background: var(--verde-light); color: var(--verde-dark); }
+  .badge-yellow { background: var(--amarillo-light); color: #92600a; }
+  .badge-red { background: var(--rojo-light); color: #b91c1c; }
+  .badge-gray { background: #f1f5f9; color: #64748b; }
+  .badge-blue { background: #eff6ff; color: #1d4ed8; }
+
+  /* Channel icons */
+  .ch-icon { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
+  .ch-on { background: var(--verde-light); color: var(--verde); }
+  .ch-partial { background: var(--amarillo-light); color: #92600a; }
+  .ch-off { background: #f1f5f9; color: #cbd5e1; }
+
+  /* Table */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table thead th { background: var(--slate); color: white; padding: 10px 12px; text-align: left; font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+  .data-table thead th:first-child { border-radius: 8px 0 0 0; }
+  .data-table thead th:last-child { border-radius: 0 8px 0 0; }
+  .data-table tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; cursor: pointer; }
+  .data-table tbody tr:hover { background: #f8fafc; }
+  .data-table tbody tr.expanded { background: #f0fdf4; }
+  .data-table td { padding: 10px 12px; vertical-align: middle; }
+
+  /* Expand panel */
+  .expand-row { display: none; }
+  .expand-row.open { display: table-row; }
+  .expand-panel { background: white; border-left: 4px solid var(--verde); border-radius: 0 8px 8px 0; padding: 20px; margin: 8px 0; }
+
+  /* Form */
+  .form-label { font-size: 12px; font-weight: 600; color: var(--slate-mid); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; display: block; }
+  .form-input { width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 14px; font-family: 'Inter', sans-serif; color: var(--slate); transition: border-color 0.2s; background: white; }
+  .form-input:focus { outline: none; border-color: var(--verde); box-shadow: 0 0 0 3px rgba(14,167,93,0.12); }
+  select.form-input { cursor: pointer; }
+  textarea.form-input { resize: vertical; min-height: 80px; }
+
+  /* Preview card */
+  .preview-card { background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); padding: 28px; position: sticky; top: 20px; }
+  .preview-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #94a3b8; margin-bottom: 4px; }
+
+  /* Buttons */
+  .btn-primary { background: var(--verde); color: white; border: none; border-radius: 8px; padding: 9px 20px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 7px; font-family: 'Inter', sans-serif; }
+  .btn-primary:hover { background: var(--verde-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(14,167,93,0.3); }
+  .btn-secondary { background: white; color: var(--slate); border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 7px; font-family: 'Inter', sans-serif; }
+  .btn-secondary:hover { border-color: var(--verde); color: var(--verde); }
+  .btn-yellow { background: var(--amarillo); color: #1a1a1a; border: none; border-radius: 8px; padding: 9px 20px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 7px; }
+  .btn-yellow:hover { background: #e09900; }
+
+  /* Search */
+  .search-wrap { position: relative; }
+  .search-wrap i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+  .search-input { padding-left: 36px; }
+
+  /* Toast */
+  #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+  .toast { background: white; border-radius: 12px; padding: 14px 18px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; min-width: 260px; animation: toastIn 0.3s ease; border-left: 4px solid var(--verde); }
+  .toast.yellow { border-left-color: var(--amarillo); }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+  /* History table */
+  .hist-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .hist-table th { background: #f8fafc; color: var(--slate-mid); padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 2px solid var(--border); }
+  .hist-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .hist-table tr:hover td { background: #f8fafc; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+  /* Section header */
+  .section-title { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--verde); margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid var(--verde-light); }
+
+  /* Stat card */
+  .stat-card { background: white; border-radius: 12px; padding: 18px 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+
+  /* Municipality level */
+  .level-alto { color: var(--verde); font-weight: 700; }
+  .level-medio { color: var(--amarillo); font-weight: 700; }
+  .level-bajo { color: var(--rojo); font-weight: 700; }
+
+  /* Org name link */
+  .org-expand-btn { font-weight: 600; color: var(--slate); display: flex; align-items: center; gap: 6px; }
+  .org-expand-btn i { color: var(--verde); font-size: 10px; transition: transform 0.2s; }
+  .org-expand-btn.open i { transform: rotate(90deg); }
+
+  /* Tab nav */
+  .subtab-btn { padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: 1.5px solid var(--border); }
+  .subtab-btn.active { background: var(--verde); color: white; border-color: var(--verde); }
+  .subtab-btn:not(.active):hover { border-color: var(--verde); color: var(--verde); }
+
+  .hidden { display: none !important; }
+  
+  .priority-alta { color: #b91c1c; font-weight: 600; }
+  .priority-media { color: #92600a; font-weight: 600; }
+  .priority-baja { color: var(--verde-dark); font-weight: 600; }
+
+  /* Modal */
+  #ficha-modal-overlay {
+    position: fixed; inset: 0; z-index: 8000;
+    background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s;
+  }
+  #ficha-modal-overlay.open { opacity: 1; pointer-events: all; }
+  #ficha-modal {
+    background: white; border-radius: 20px; width: 100%; max-width: 720px;
+    max-height: 88vh; overflow-y: auto; box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+    transform: translateY(24px) scale(0.97); transition: transform 0.25s;
+  }
+  #ficha-modal-overlay.open #ficha-modal { transform: translateY(0) scale(1); }
+
+  .modal-header { background: var(--verde); padding: 24px 28px 20px; border-radius: 20px 20px 0 0; position: sticky; top: 0; z-index: 2; }
+  .modal-body { padding: 24px 28px; }
+  .modal-section { margin-bottom: 22px; }
+  .modal-section-title { font-family: 'Poppins', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--verde); border-bottom: 2px solid var(--verde-light); padding-bottom: 6px; margin-bottom: 14px; }
+  .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .modal-field-label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94a3b8; margin-bottom: 3px; }
+  .modal-field-val { font-size: 13px; color: var(--slate); line-height: 1.5; }
+  .modal-step { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; font-size: 13px; color: var(--slate); }
+  .modal-step-num { min-width: 22px; height: 22px; background: var(--verde); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+  .modal-req-item { padding: 4px 0; font-size: 13px; color: var(--slate-mid); display: flex; gap: 6px; align-items: flex-start; }
+  .modal-req-item::before { content: "•"; color: var(--verde); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- Header -->
+<header style="background: var(--slate); border-bottom: 3px solid var(--verde);">
+  <div style="max-width: 1400px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 62px;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div style="width: 36px; height: 36px; background: var(--verde); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+        <i class="fas fa-landmark" style="color: white; font-size: 16px;"></i>
+      </div>
+      <div>
+        <div style="color: white; font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 16px; line-height: 1.1;">Portal de Relevamiento</div>
+        <div style="color: #94a3b8; font-size: 11px; letter-spacing: 0.05em;">PROVINCIA DE CORRIENTES · ACTIVOS DIGITALES</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <span style="color: #64748b; font-size: 12px;"><i class="fas fa-calendar-alt" style="margin-right: 5px;"></i>Actualizado: Jun 2026</span>
+      <span class="badge badge-green"><i class="fas fa-circle" style="font-size: 7px;"></i> Sistema Activo</span>
+    </div>
+  </div>
+</header>
+
+<!-- Main Nav Tabs -->
+<div style="background: white; border-bottom: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+  <div style="max-width: 1400px; margin: 0 auto; padding: 0 24px; display: flex; gap: 2px;">
+    <button class="tab-btn active" data-tab="diagnostico" style="padding: 16px 24px; font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 13px; background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+      <i class="fas fa-table-cells-large" style="color: var(--verde);"></i> Diagnóstico de Organismos
+    </button>
+    <button class="tab-btn" data-tab="tramites" style="padding: 16px 24px; font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 13px; background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+      <i class="fas fa-file-lines" style="color: #94a3b8;"></i> Ficha Técnica de Trámites
+    </button>
+  </div>
+</div>
+
+<!-- =================== TAB 1: DIAGNOSTICO =================== -->
+<div id="tab-diagnostico" class="tab-content active">
+  <div style="max-width: 1400px; margin: 0 auto; padding: 24px;">
+
+    <!-- KPI Strip -->
+    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 24px;">
+      <div class="stat-card">
+        <div style="font-size: 28px; font-weight: 800; color: var(--verde); font-family: 'Poppins', sans-serif;" id="kpi-total">20</div>
+        <div style="font-size: 12px; color: var(--slate-mid); margin-top: 2px;">Organismos Relevados</div>
+      </div>
+      <div class="stat-card">
+        <div style="font-size: 28px; font-weight: 800; color: var(--verde); font-family: 'Poppins', sans-serif;" id="kpi-activos">19</div>
+        <div style="font-size: 12px; color: var(--slate-mid); margin-top: 2px;">Sitios Activos</div>
+      </div>
+      <div class="stat-card">
+        <div style="font-size: 28px; font-weight: 800; color: var(--amarillo); font-family: 'Poppins', sans-serif;" id="kpi-chatbot">4</div>
+        <div style="font-size: 12px; color: var(--slate-mid); margin-top: 2px;">Con Chatbot / IA</div>
+      </div>
+      <div class="stat-card">
+        <div style="font-size: 28px; font-weight: 800; color: #6366f1; font-family: 'Poppins', sans-serif;" id="kpi-munis">63</div>
+        <div style="font-size: 12px; color: var(--slate-mid); margin-top: 2px;">Municipios Relevados</div>
+      </div>
+      <div class="stat-card">
+        <div style="font-size: 28px; font-weight: 800; color: var(--rojo); font-family: 'Poppins', sans-serif;" id="kpi-sinweb">8</div>
+        <div style="font-size: 12px; color: var(--slate-mid); margin-top: 2px;">Municipios Sin Web</div>
+      </div>
+    </div>
+
+    <!-- Sub-tabs: Ministerios / Municipios / Plataformas -->
+    <div style="display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap;">
+      <button class="subtab-btn active" data-subtab="ministerios">
+        <i class="fas fa-building-columns" style="margin-right: 6px;"></i> Ministerios y Entes
+      </button>
+      <button class="subtab-btn" data-subtab="municipios">
+        <i class="fas fa-city" style="margin-right: 6px;"></i> Municipios
+      </button>
+      <button class="subtab-btn" data-subtab="plataformas">
+        <i class="fas fa-globe" style="margin-right: 6px;"></i> Plataformas Online
+      </button>
+    </div>
+
+    <!-- Search & Filters -->
+    <div style="background: white; border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
+      <div class="search-wrap" style="flex: 1; min-width: 200px;">
+        <i class="fas fa-search"></i>
+        <input type="text" id="search-input" class="form-input search-input" placeholder="Buscar organismo..." oninput="filterTable()">
+      </div>
+      <select id="filter-tipo" class="form-input" style="width: auto; min-width: 150px;" onchange="filterTable()">
+        <option value="">Todos los tipos</option>
+        <option value="Ministerio">Ministerio</option>
+        <option value="Ente Autárquico">Ente Autárquico</option>
+      </select>
+      <select id="filter-estado" class="form-input" style="width: auto; min-width: 150px;" onchange="filterTable()">
+        <option value="">Todos los estados</option>
+        <option value="Activo">Activo</option>
+        <option value="No identificado">No identificado</option>
+      </select>
+      <select id="filter-chatbot" class="form-input" style="width: auto; min-width: 150px;" onchange="filterTable()">
+        <option value="">Con/Sin Chatbot</option>
+        <option value="Si">Con Chatbot</option>
+        <option value="No">Sin Chatbot</option>
+      </select>
+      <button class="btn-secondary" onclick="resetFilters()"><i class="fas fa-rotate-left"></i> Limpiar</button>
+    </div>
+
+    <!-- MINISTERIOS TABLE -->
+    <div id="subtab-ministerios" class="subtab-content active">
+      <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow-x: auto;">
+        <table class="data-table" id="ministerios-table">
+          <thead>
+            <tr>
+              <th style="width: 32px;"></th>
+              <th>Organismo / Ministerio</th>
+              <th>Tipo</th>
+              <th>Web</th>
+              <th>Última Act.</th>
+              <th>Estado</th>
+              <th style="text-align:center;">Guía</th>
+              <th style="text-align:center;">Trám. Online</th>
+              <th style="text-align:center;">Turnos</th>
+              <th style="text-align:center;">Atención Dig.</th>
+              <th style="text-align:center;">Seguimiento</th>
+              <th style="text-align:center;">IA/Chat</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="ministerios-tbody">
+          </tbody>
+        </table>
+        <div id="no-results" class="hidden" style="padding: 40px; text-align: center; color: #94a3b8;">
+          <i class="fas fa-search" style="font-size: 32px; margin-bottom: 10px; display: block;"></i>
+          No se encontraron resultados
+        </div>
+      </div>
+    </div>
+
+    <!-- MUNICIPIOS TABLE -->
+    <div id="subtab-municipios" class="subtab-content hidden">
+      <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow-x: auto;">
+        <table class="data-table" id="municipios-table">
+          <thead>
+            <tr>
+              <th>Municipio</th>
+              <th>Web</th>
+              <th>Estado</th>
+              <th>Nivel</th>
+              <th style="text-align:center;">Guía Trám.</th>
+              <th style="text-align:center;">Trám. Online</th>
+              <th style="text-align:center;">Turnos</th>
+              <th style="text-align:center;">Atención Dig.</th>
+              <th style="text-align:center;">Seguimiento</th>
+              <th style="text-align:center;">Chatbot</th>
+              <th>Instagram</th>
+            </tr>
+          </thead>
+          <tbody id="municipios-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PLATAFORMAS TABLE -->
+    <div id="subtab-plataformas" class="subtab-content hidden">
+      <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
+          <span class="section-title">Plataformas con Servicios Online Identificados</span>
+        </div>
+        <div style="overflow-x: auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Organismo</th>
+              <th>Descripción del Servicio</th>
+              <th>Observaciones</th>
+              <th>Conexión</th>
+              <th>Enlace</th>
+            </tr>
+          </thead>
+          <tbody id="plataformas-tbody"></tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- =================== TAB 2: TRAMITES =================== -->
+<div id="tab-tramites" class="tab-content">
+  <div style="max-width: 1400px; margin: 0 auto; padding: 24px;">
+    <div style="display: grid; grid-template-columns: 1fr 420px; gap: 24px; align-items: start;">
+
+      <!-- Form Column -->
+      <div>
+        <div style="background: white; border-radius: 16px; padding: 28px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 24px;">
+            <div style="width: 38px; height: 38px; background: var(--verde-light); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+              <i class="fas fa-file-pen" style="color: var(--verde);"></i>
+            </div>
+            <div>
+              <h2 style="font-size: 17px; font-weight: 700; margin: 0;">Ficha Técnica de Trámite</h2>
+              <p style="font-size: 12px; color: var(--slate-mid); margin: 0;">Complete los campos · La vista previa se actualiza en tiempo real</p>
+            </div>
+          </div>
+
+          <!-- SECCIÓN A -->
+          <div class="section-title"><i class="fas fa-tag" style="margin-right: 6px;"></i> A — Identificación</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px;">
+            <div style="grid-column: 1/-1;">
+              <label class="form-label">Nombre del Trámite *</label>
+              <input type="text" id="f-nombre" class="form-input" placeholder="Ej: Matriculación Profesional" oninput="updatePreview()">
+            </div>
+            <div>
+              <label class="form-label">Categoría</label>
+              <select id="f-categoria" class="form-input" onchange="updatePreview()">
+                <option value="">Seleccionar...</option>
+                <option>Salud</option><option>Educación</option><option>Producción</option>
+                <option>Seguridad</option><option>Hacienda</option><option>Justicia</option>
+                <option>Turismo</option><option>Obras Públicas</option><option>Desarrollo Social</option>
+                <option>Trabajo</option><option>Vivienda</option><option>Otros</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Momento de Vida</label>
+              <select id="f-momento" class="form-input" onchange="updatePreview()">
+                <option value="">Seleccionar...</option>
+                <option>Al nacer</option><option>Estudiar</option><option>Emprender</option>
+                <option>Trabajar</option><option>Jubilarse</option><option>Viajar</option>
+                <option>Construir</option><option>Mudarse</option><option>Cualquier momento</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Tipo</label>
+              <select id="f-tipo" class="form-input" onchange="updatePreview()">
+                <option value="">Seleccionar...</option>
+                <option>Digital</option><option>Presencial</option><option>Mixto</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Organismo Responsable</label>
+              <select id="f-organismo" class="form-input" onchange="updatePreview()">
+                <option value="">Seleccionar...</option>
+                <option>Ministerio de Educación</option>
+                <option>Ministerio de Salud Pública</option>
+                <option>Ministerio de Hacienda y Finanzas</option>
+                <option>Ministerio de Seguridad</option>
+                <option>Ministerio de Desarrollo Social</option>
+                <option>Ministerio de Justicia y DDHH</option>
+                <option>Ministerio de Producción</option>
+                <option>Ministerio de Industria, Trabajo y Comercio</option>
+                <option>Ministerio de Obras y Servicios Públicos</option>
+                <option>Ministerio de Turismo</option>
+                <option>Ministerio de Coordinación y Planificación</option>
+                <option>Secretaría General de la Gobernación</option>
+                <option>DPEC</option><option>IOSCOR</option><option>INVICO</option>
+                <option>Instituto de Previsión Social (IPS)</option>
+                <option>Instituto de Cultura</option>
+                <option>Lotería Correntina</option>
+                <option>AOSC</option><option>Vialidad Provincial</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- SECCIÓN B -->
+          <div class="section-title"><i class="fas fa-sliders" style="margin-right: 6px;"></i> B — Gestión y Control</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px;">
+            <div>
+              <label class="form-label">Fecha de Relevamiento</label>
+              <input type="date" id="f-fecha" class="form-input" oninput="updatePreview()">
+            </div>
+            <div>
+              <label class="form-label">Estado</label>
+              <select id="f-estado" class="form-input" onchange="updatePreview()">
+                <option value="">Seleccionar...</option>
+                <option>Borrador</option><option>En Revisión</option><option>Aprobado</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Prioridad</label>
+              <select id="f-prioridad" class="form-input" onchange="updatePreview()">
+                <option value="">Seleccionar...</option>
+                <option>Alta</option><option>Media</option><option>Baja</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Temporalidad</label>
+              <select id="f-temporalidad" class="form-input" onchange="updatePreview()">
+                <option value="">Seleccionar...</option>
+                <option>Permanente</option><option>Campaña</option><option>Con Vencimiento</option>
+              </select>
+            </div>
+            <div style="grid-column: 1/-1;">
+              <label class="form-label">Responsable de Carga (Nombre / Mail)</label>
+              <input type="text" id="f-responsable" class="form-input" placeholder="Ej: Juan Pérez / jperez@corrientes.gov.ar" oninput="updatePreview()">
+            </div>
+          </div>
+
+          <!-- SECCIÓN C -->
+          <div class="section-title"><i class="fas fa-file-alt" style="margin-right: 6px;"></i> C — Cuerpo del Trámite</div>
+          <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
+            <div>
+              <label class="form-label">Descripción / Resumen Ejecutivo</label>
+              <textarea id="f-descripcion" class="form-input" placeholder="Describe brevemente en qué consiste el trámite..." oninput="updatePreview()"></textarea>
+            </div>
+            <div>
+              <label class="form-label">¿A quién va dirigido? (Público Objetivo)</label>
+              <input type="text" id="f-dirigido" class="form-input" placeholder="Ej: Profesionales de la salud con título habilitante" oninput="updatePreview()">
+            </div>
+            <div>
+              <label class="form-label">Requisitos / Documentación</label>
+              <textarea id="f-requisitos" class="form-input" placeholder="Listar los requisitos, uno por línea..." oninput="updatePreview()"></textarea>
+            </div>
+            <div>
+              <label class="form-label">Pasos del Proceso</label>
+              <textarea id="f-pasos" class="form-input" placeholder="1. Ingresar a...\n2. Completar el formulario...\n3. Presentar en..." oninput="updatePreview()"></textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              <div>
+                <label class="form-label">Costos</label>
+                <select id="f-costos" class="form-input" onchange="updatePreview()">
+                  <option value="">Seleccionar...</option>
+                  <option>Gratuito</option><option>Con costo asociado</option><option>Variable</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Dónde se realiza</label>
+                <input type="text" id="f-donde" class="form-input" placeholder="Dirección o URL" oninput="updatePreview()">
+              </div>
+            </div>
+            <div>
+              <label class="form-label">CTA / Enlace de Acción Directa</label>
+              <input type="url" id="f-cta" class="form-input" placeholder="https://..." oninput="updatePreview()">
+            </div>
+          </div>
+
+          <!-- SECCIÓN D -->
+          <div class="section-title"><i class="fas fa-note-sticky" style="margin-right: 6px;"></i> D — Observaciones</div>
+          <div style="margin-bottom: 24px;">
+            <label class="form-label">Notas Adicionales</label>
+            <textarea id="f-notas" class="form-input" style="min-height: 60px;" placeholder="Observaciones, pendientes, aclaraciones..." oninput="updatePreview()"></textarea>
+          </div>
+
+          <!-- Actions -->
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn-primary" onclick="saveTramite()"><i class="fas fa-floppy-disk"></i> Guardar Ficha</button>
+            <button class="btn-secondary" onclick="copyMarkdown()"><i class="fas fa-copy"></i> Copiar Ficha (MD)</button>
+            <button class="btn-secondary" onclick="clearForm()" style="margin-left: auto;"><i class="fas fa-trash-can"></i> Limpiar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview Column -->
+      <div>
+        <div class="preview-card">
+          <div style="display: flex; align-items: center; margin-bottom: 18px; gap: 8px;">
+            <div style="font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 14px;">Vista Previa en Tiempo Real</div>
+            <div style="margin-left: auto;"><span class="badge badge-green"><i class="fas fa-eye"></i> Live</span></div>
+          </div>
+
+          <!-- Preview card content -->
+          <div style="border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden;">
+            <div id="prev-header" style="background: var(--verde); padding: 16px 18px;">
+              <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+                <div id="prev-tipo-badge" style="background: rgba(255,255,255,0.2); color: white; font-size: 10px; font-weight: 700; padding: 2px 10px; border-radius: 999px;">DIGITAL</div>
+                <div id="prev-cat-badge" style="background: rgba(255,255,255,0.2); color: white; font-size: 10px; font-weight: 700; padding: 2px 10px; border-radius: 999px;">CATEGORÍA</div>
+              </div>
+              <div id="prev-nombre" style="color: white; font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 16px; line-height: 1.3;">Nombre del Trámite</div>
+              <div id="prev-organismo" style="color: rgba(255,255,255,0.75); font-size: 12px; margin-top: 4px;">Organismo responsable</div>
+            </div>
+            <div style="padding: 16px 18px; background: white;">
+              <div id="prev-descripcion" style="font-size: 13px; color: var(--slate-mid); margin-bottom: 14px; line-height: 1.6; font-style: italic;">La descripción del trámite aparecerá aquí...</div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+                <div>
+                  <div class="preview-label">Público Objetivo</div>
+                  <div id="prev-dirigido" style="font-size: 13px; color: var(--slate);">—</div>
+                </div>
+                <div>
+                  <div class="preview-label">Costo</div>
+                  <div id="prev-costos" style="font-size: 13px; color: var(--slate);">—</div>
+                </div>
+                <div>
+                  <div class="preview-label">Dónde</div>
+                  <div id="prev-donde" style="font-size: 13px; color: var(--slate);">—</div>
+                </div>
+                <div>
+                  <div class="preview-label">Momento</div>
+                  <div id="prev-momento" style="font-size: 13px; color: var(--slate);">—</div>
+                </div>
+              </div>
+
+              <div id="prev-requisitos-wrap" style="margin-bottom: 14px;">
+                <div class="preview-label">Requisitos</div>
+                <div id="prev-requisitos" style="font-size: 13px; color: var(--slate);">—</div>
+              </div>
+
+              <div id="prev-pasos-wrap" style="margin-bottom: 14px;">
+                <div class="preview-label">Pasos</div>
+                <div id="prev-pasos" style="font-size: 13px; color: var(--slate);">—</div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;">
+                <div id="prev-prioridad-badge"></div>
+                <div id="prev-estado-badge"></div>
+                <div id="prev-temp-badge"></div>
+              </div>
+
+              <div id="prev-cta-wrap" style="display: none;">
+                <a id="prev-cta" href="#" target="_blank" style="display: block; background: var(--verde); color: white; text-align: center; padding: 10px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 13px; font-family: 'Poppins', sans-serif;">
+                  <i class="fas fa-arrow-right-to-bracket" style="margin-right: 6px;"></i> Iniciar Trámite
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Table -->
+    <div style="margin-top: 28px; background: white; border-radius: 16px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
+     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div class="section-title" style="margin-bottom: 0; border: none; padding: 0;"><i class="fas fa-clock-rotate-left" style="margin-right: 6px;"></i> Historial de Fichas Guardadas</div>
+        <span id="hist-count" class="badge badge-gray">0 fichas</span>
+             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span id="hist-count" class="badge badge-gray">0 fichas</span>
+          <!-- Exportar JSON -->
+          <button onclick="exportJSON()" title="Descargar todas las fichas como archivo JSON"
+            style="display:inline-flex; align-items:center; gap:6px; background:white;
+                   color:var(--slate); border:1.5px solid var(--border); border-radius:8px;
+                   padding:6px 14px; font-size:12px; font-weight:600; cursor:pointer;
+                   font-family:'Inter',sans-serif; transition:all .15s;"
+            onmouseover="this.style.borderColor='var(--verde)'; this.style.color='var(--verde)'"
+            onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--slate)'">
+            <i class="fas fa-download"></i> Exportar JSON
+          </button>
+          <!-- Importar JSON -->
+          <button onclick="document.getElementById('import-file-input').click()" title="Cargar fichas desde un archivo JSON exportado previamente"
+            style="display:inline-flex; align-items:center; gap:6px; background:white;
+                   color:var(--slate); border:1.5px solid var(--border); border-radius:8px;
+                   padding:6px 14px; font-size:12px; font-weight:600; cursor:pointer;
+                   font-family:'Inter',sans-serif; transition:all .15s;"
+            onmouseover="this.style.borderColor='var(--amarillo)'; this.style.color='#92600a'"
+            onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--slate)'">
+            <i class="fas fa-upload"></i> Importar JSON
+          </button>
+          <!-- Input file oculto -->
+          <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importJSON(event)">
+        </div>
+      </div>
+
+      <!-- Filtros por columna (ocultos hasta que haya fichas) -->
+      <div id="hist-filters" style="display:none; gap:6px; margin-bottom:12px; flex-wrap:wrap; align-items:center;">
+        <input id="hf-nombre"    type="text" placeholder="🔍 Nombre…"    oninput="applyHistFilters()" class="form-input" style="flex:1; min-width:140px; font-size:12px; padding:6px 10px;">
+        <input id="hf-organismo" type="text" placeholder="🔍 Organismo…" oninput="applyHistFilters()" class="form-input" style="flex:1; min-width:130px; font-size:12px; padding:6px 10px;">
+        <select id="hf-categoria" onchange="applyHistFilters()" class="form-input" style="min-width:120px; font-size:12px; padding:6px 10px;">
+          <option value="">Categoría</option>
+          <option>Salud</option><option>Educación</option><option>Producción</option>
+          <option>Seguridad</option><option>Hacienda</option><option>Justicia</option>
+          <option>Turismo</option><option>Obras Públicas</option><option>Desarrollo Social</option>
+          <option>Trabajo</option><option>Vivienda</option><option>Otros</option>
+        </select>
+        <select id="hf-tipo" onchange="applyHistFilters()" class="form-input" style="min-width:110px; font-size:12px; padding:6px 10px;">
+          <option value="">Tipo</option>
+          <option>Digital</option><option>Presencial</option><option>Mixto</option>
+        </select>
+        <select id="hf-prioridad" onchange="applyHistFilters()" class="form-input" style="min-width:110px; font-size:12px; padding:6px 10px;">
+          <option value="">Prioridad</option>
+          <option>Alta</option><option>Media</option><option>Baja</option>
+        </select>
+        <select id="hf-estado" onchange="applyHistFilters()" class="form-input" style="min-width:120px; font-size:12px; padding:6px 10px;">
+          <option value="">Estado</option>
+          <option>Borrador</option><option>En Revisión</option><option>Aprobado</option>
+        </select>
+        <input id="hf-fecha" type="date" oninput="applyHistFilters()" class="form-input" style="min-width:130px; font-size:12px; padding:6px 10px;" title="Filtrar por fecha exacta">
+        <button onclick="clearHistFilters()" title="Limpiar filtros"
+          style="background:white; color:#64748b; border:1.5px solid var(--border); border-radius:8px;
+                 padding:6px 12px; font-size:12px; cursor:pointer; display:inline-flex;
+                 align-items:center; gap:5px; transition:all .15s; white-space:nowrap;"
+          onmouseover="this.style.borderColor='var(--verde)'; this.style.color='var(--verde)'"
+          onmouseout="this.style.borderColor='var(--border)'; this.style.color='#64748b'">
+          <i class="fas fa-rotate-left"></i> Limpiar
+        </button>
+      </div>
+
+      <div id="hist-empty" style="text-align: center; padding: 32px; color: #94a3b8;">
+        <i class="fas fa-inbox" style="font-size: 28px; margin-bottom: 8px; display: block;"></i>
+        Aún no hay fichas guardadas. Complete el formulario y presione "Guardar Ficha".
+      </div>
+      <div id="hist-table-wrap" class="hidden" style="overflow-x: auto;">
+        <table class="hist-table">
+          <thead>
+            <tr>
+              <th style="cursor:pointer; user-select:none; white-space:nowrap;" onclick="sortHist('id')"># <i id="sort-icon-id" class="fas fa-sort" style="font-size:9px; color:#94a3b8;"></i></th>
+              <th style="cursor:pointer; user-select:none; white-space:nowrap;" onclick="sortHist('nombre')">Nombre del Trámite <i id="sort-icon-nombre" class="fas fa-sort" style="font-size:9px; color:#94a3b8;"></i></th>
+              <th style="cursor:pointer; user-select:none; white-space:nowrap;" onclick="sortHist('organismo')">Organismo <i id="sort-icon-organismo" class="fas fa-sort" style="font-size:9px; color:#94a3b8;"></i></th>
+              <th style="cursor:pointer; user-select:none; white-space:nowrap;" onclick="sortHist('categoria')">Categoría <i id="sort-icon-categoria" class="fas fa-sort" style="font-size:9px; color:#94a3b8;"></i></th>
+              <th style="cursor:pointer; user-select:none; white-space:nowrap;" onclick="sortHist('tipo')">Tipo <i id="sort-icon-tipo" class="fas fa-sort" style="font-size:9px; color:#94a3b8;"></i></th>
+              <th style="cursor:pointer; user-select:none; white-space:nowrap;" onclick="sortHist('prioridad')">Prioridad <i id="sort-icon-prioridad" class="fas fa-sort" style="font-size:9px; color:#94a3b8;"></i></th>
+              <th style="cursor:pointer; user-select:none; white-space:nowrap;" onclick="sortHist('estado')">Estado <i id="sort-icon-estado" class="fas fa-sort" style="font-size:9px; color:#94a3b8;"></i></th>
+              <th style="cursor:pointer; user-select:none; white-space:nowrap;" onclick="sortHist('fecha')">Fecha <i id="sort-icon-fecha" class="fas fa-sort" style="font-size:9px; color:#94a3b8;"></i></th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="hist-tbody"></tbody>
+        </table>
+        <div id="hist-no-results" style="display:none; text-align:center; padding:24px; color:#94a3b8; font-size:13px;">
+          <i class="fas fa-filter" style="margin-right:6px;"></i> Ninguna ficha coincide con los filtros aplicados.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== FICHA MODAL ========== -->
+<div id="ficha-modal-overlay" onclick="closeModal(event)">
+  <div id="ficha-modal">
+
+    <!-- Modal Header -->
+    <div class="modal-header">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">
+        <div style="flex:1;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;" id="modal-badges"></div>
+          <div id="modal-nombre" style="color:white; font-family:'Poppins',sans-serif; font-weight:800; font-size:20px; line-height:1.25;"></div>
+          <div id="modal-organismo" style="color:rgba(255,255,255,0.72); font-size:13px; margin-top:6px;"></div>
+        </div>
+        <button onclick="closeModalDirect()" style="background:rgba(255,255,255,0.15); border:none; color:white; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+          <i class="fas fa-xmark"></i>
+        </button>
+      </div>
+      <!-- Meta strip -->
+      <div style="display:flex; gap:20px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.2);">
+        <div><div style="color:rgba(255,255,255,0.55); font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:2px;">Estado</div><div id="modal-estado-meta" style="color:white; font-size:13px; font-weight:600;"></div></div>
+        <div><div style="color:rgba(255,255,255,0.55); font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:2px;">Prioridad</div><div id="modal-prioridad-meta" style="color:white; font-size:13px; font-weight:600;"></div></div>
+        <div><div style="color:rgba(255,255,255,0.55); font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:2px;">Temporalidad</div><div id="modal-temp-meta" style="color:white; font-size:13px; font-weight:600;"></div></div>
+        <div><div style="color:rgba(255,255,255,0.55); font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:2px;">Relevado</div><div id="modal-fecha-meta" style="color:white; font-size:13px; font-weight:600;"></div></div>
+        <div style="margin-left:auto;"><div style="color:rgba(255,255,255,0.55); font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:2px;">Responsable</div><div id="modal-resp-meta" style="color:white; font-size:13px;"></div></div>
+      </div>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="modal-body">
+
+      <!-- Descripción -->
+      <div class="modal-section">
+        <div class="modal-section-title"><i class="fas fa-align-left" style="margin-right:6px;"></i>Descripción</div>
+        <div id="modal-descripcion" style="font-size:14px; color:var(--slate-mid); line-height:1.7; background:#f8fafc; border-radius:10px; padding:14px 16px; border-left:3px solid var(--verde);"></div>
+      </div>
+
+      <!-- Info Grid -->
+      <div class="modal-section">
+        <div class="modal-section-title"><i class="fas fa-info-circle" style="margin-right:6px;"></i>Información General</div>
+        <div class="modal-grid">
+          <div><div class="modal-field-label">Público objetivo</div><div class="modal-field-val" id="modal-dirigido"></div></div>
+          <div><div class="modal-field-label">Momento de vida</div><div class="modal-field-val" id="modal-momento"></div></div>
+          <div><div class="modal-field-label">Costo</div><div class="modal-field-val" id="modal-costos"></div></div>
+          <div><div class="modal-field-label">Dónde se realiza</div><div class="modal-field-val" id="modal-donde"></div></div>
+        </div>
+      </div>
+
+      <!-- Requisitos -->
+      <div class="modal-section" id="modal-req-section">
+        <div class="modal-section-title"><i class="fas fa-list-check" style="margin-right:6px;"></i>Requisitos</div>
+        <div id="modal-requisitos"></div>
+      </div>
+
+      <!-- Pasos -->
+      <div class="modal-section" id="modal-pasos-section">
+        <div class="modal-section-title"><i class="fas fa-shoe-prints" style="margin-right:6px;"></i>Pasos del Proceso</div>
+        <div id="modal-pasos"></div>
+      </div>
+
+      <!-- CTA -->
+      <div id="modal-cta-section" style="margin-bottom:22px; display:none;">
+        <a id="modal-cta-link" href="#" target="_blank" style="display:flex; align-items:center; justify-content:center; gap:10px; background:var(--verde); color:white; text-decoration:none; padding:14px 24px; border-radius:12px; font-family:'Poppins',sans-serif; font-weight:700; font-size:14px; transition:background 0.2s;" onmouseover="this.style.background='var(--verde-dark)'" onmouseout="this.style.background='var(--verde)'">
+          <i class="fas fa-arrow-right-to-bracket"></i> Iniciar Trámite Online
+        </a>
+      </div>
+
+      <!-- Notas -->
+      <div class="modal-section" id="modal-notas-section" style="display:none;">
+        <div class="modal-section-title"><i class="fas fa-note-sticky" style="margin-right:6px;"></i>Notas y Observaciones</div>
+        <div id="modal-notas" style="font-size:13px; color:var(--slate-mid); background:var(--amarillo-light); border-radius:10px; padding:12px 16px; border-left:3px solid var(--amarillo);"></div>
+      </div>
+
+      <!-- Footer actions -->
+      <div style="display:flex; gap:10px; padding-top:16px; border-top:1px solid var(--border); flex-wrap:wrap;">
+        <button id="modal-edit-btn" class="btn-primary" onclick="modalEditAction()"><i class="fas fa-pen"></i> Editar Ficha</button>
+        <button id="modal-copy-btn" class="btn-secondary" onclick="modalCopyAction()"><i class="fas fa-copy"></i> Copiar Markdown</button>
+        <button id="modal-delete-btn" class="btn-secondary" style="color:#ef4444; margin-left:auto;" onclick="modalDeleteAction()"><i class="fas fa-trash"></i> Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== DATA =====================
+const MINISTERIOS = [
+  { id: 1, nombre: "Ministerio de Educación", tipo: "Ministerio", tieneWeb: "Si", enlacePortal: "https://www.corrientes.gob.ar/mec", enlacePropio: "https://mec.gob.ar", ultimaAct: "2026-04-01", estado: "Activo", guia: "Tiene", tramitesOnline: "No tiene", turnos: "No tiene", atencionDig: "Tiene", seguimiento: "Tiene", ia: "No", chatbot: "No", ministro: "Cdra. Ana Faustina Miño", dir: "La Rioja 663", tel: "379 4123456", mail: "ministerio@mec.gob.ar", dependencias: ["Subsecretaría de Gestión Educativa","Subsecretaría de Gestión Administrativa","Subsecretaría de Infraestructura Escolar","Subsecretaría de Contenido Audiovisuales","Secretaría General","Asesoría Legal","Sumarios","Prensa"], tramites: [{"nombre":"Actualización de haberes (DI.G.E.P)","enlace":"https://www.corrientes.gob.ar/tramite/146/actualizacion-de-haberes--digep"},{"nombre":"Certificación de Servicios (Dir. de Recursos Humanos)","enlace":"https://www.corrientes.gob.ar/tramite/129/certificacion-de-servicios--dir-de-recursos-humanos"},{"nombre":"Consulta sobre liquidaciones de haberes y/o Salario familiar (Dir. de RRHH)","enlace":"https://www.corrientes.gob.ar/tramite/131/consulta-sobre-liquidaciones-de-haberes-yo-salario-familiar--dir-de-rrhh"},{"nombre":"Designación suplente/interino/titular (DI.G.E.P)","enlace":"https://www.corrientes.gob.ar/tramite/141/designacion-suplente-interino-titular--digep"},{"nombre":"Incorporación de institutos a la Enseñanza Oficial (DI.G.E.P)","enlace":"https://www.corrientes.gob.ar/tramite/147/incorporacion-de-institutos-a-la-ensenanza-oficial--digep"},{"nombre":"Licencias (Consejo General de Educación)","enlace":"https://www.corrientes.gob.ar/tramite/39/licencias-consejo-general-de-educacion"},{"nombre":"Licencias, permisos, justificación de inasistencia del personal docente (DI.G.E.P)","enlace":"https://www.corrientes.gob.ar/tramite/145/licencias-permisos-justificacion-de-inasistencias-del-personal-docente--digep"},{"nombre":"Normas Legales - Notificaciones - Disposiciones legalmente certificadas (Dirección de Nivel Secundario)","enlace":"https://www.corrientes.gob.ar/tramite/40/normas-legales---notificaciones---disposiciones-legalmente-certigicadas-direccion-de-nivel-secundario"},{"nombre":"Permuta de cargo (Consejo General de Educación)","enlace":"https://www.corrientes.gob.ar/tramite/126/permuta-de-cargo-consejo-general-de-educacion"},{"nombre":"Registro de firmas de Autoridades y Representante Legal de los institutos (DI.G.E.P)","enlace":"https://www.corrientes.gob.ar/tramite/148/registro-de-firmas-de-autoridades-y-representante-legal-de-los-institutos-incorporados-o-registrados--digep"},{"nombre":"Registro de Institutos Parasistémáticos (DI.G.E.P)","enlace":"https://www.corrientes.gob.ar/tramite/149/registro-de-institutos-parasistematicos--digep"},{"nombre":"Renuncia por Motivos Particulares (Consejo General de Educación)","enlace":"https://www.corrientes.gob.ar/tramite/127/renuncia-por-motivos-particulares-consejo-general-de-educacion"},{"nombre":"Renuncia por razones particulares (S-I-T) Dirección de Nivel Secundario","enlace":"https://www.corrientes.gob.ar/tramite/38/renuncia-por-razones-particulares-s--i--t---direccion-de-nivel-secundario"},{"nombre":"Renuncias por Jubilación (DI.G.E.P)","enlace":"https://www.corrientes.gob.ar/tramite/142/renuncias-por-jubilacion--digep"},{"nombre":"Requisitos para conformación del legajo personal ante DI.G.E.P (Privada)","enlace":"https://www.corrientes.gob.ar/tramite/140/requisitos-para-conformacion-del-legajo-personal-ante-digep-privada"},{"nombre":"Salario Familiar - Cobro de Escolaridad - Cobro Prenatal - Nacimiento - Casamiento (DI.G.E.P)","enlace":"https://www.corrientes.gob.ar/tramite/144/salario-familiar---cobro-de-escolaridad---cobro-prenatal---nacimiento---casamiento---asignaciones-familiares--digep"},{"nombre":"Solicitud de Constancia de haberes actualizados (Dir. de RRHH)","enlace":""},{"nombre":"Solicitud de copias de normas legales (Consejo General de Educación)","enlace":""},{"nombre":"Solicitud de recibos de sueldo (Consejo General de Educación)","enlace":""},{"nombre":"Solicitud de Salario Familiar (Consejo General de Educación)","enlace":""},{"nombre":"Solicitud de Traslado definitivo (Consejo General de Educación)","enlace":"https://www.corrientes.gob.ar/tramite/123/solicitud-de-traslado-definitivo-consejo-general-de-educacion"},{"nombre":"Solicitud de traslado transitorio (Consejo General de Educación)","enlace":"https://www.corrientes.gob.ar/tramite/120/solicitud-de-traslado-transitorio-consejo-general-de-educacion"},{"nombre":"Solicitud y pedidos de planilla de datos y carga de antigüedad (Consejo General de Educación)","enlace":"https://www.corrientes.gob.ar/tramite/128/solicitud-y-pedidos-de-planilla-de-datos-y-carga-de-antiguedad-consejo-general-de-educacion"},{"nombre":"Traslado Definitivo Interjurisdiccional (Consejo General de Educación)","enlace":"https://www.corrientes.gob.ar/tramite/124/traslado-definitivo-interjurisdiccional-consejo-general-de-educacion"},{"nombre":"Traslado provisorio Interjurisdiccional (Consejo General de Educación)","enlace":"https://www.corrientes.gob.ar/tramite/125/traslado-provisorio-interjurisdiccional-consejo-general-de-educacion"}] },
+  { id: 2, nombre: "Ministerio de Salud Pública", tipo: "Ministerio", tieneWeb: "Si", enlacePortal: "https://saludcorrientes.gob.ar/w/", enlacePropio: "https://saludcorrientes.gob.ar/w/", ultimaAct: "2026-06-10", estado: "Activo", guia: "Solo algunos", tramitesOnline: "No tiene", turnos: "Tiene", atencionDig: "No tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "Dr. Carlos José Vignolo", dir: "Córdoba 640", tel: "—", mail: "—", dependencias: ["Subsecretaría de Salud Pública","Instituto de Cardiología Juana Francisca Cabral","Dirección de Epidemiología"], tramites: [{"nombre":"Jubilación","enlace":"https://saludcorrientes.gob.ar/w/jubilacion/"},{"nombre":"Matriculación Profesional","enlace":""},{"nombre":"Solicitud de Certificado de Servicio","enlace":""},{"nombre":"Solicitud para el Cobro del Salario Familiar","enlace":""},{"nombre":"Declaración de Beneficiarios del Seguro de Vida","enlace":""},{"nombre":"Denuncia de Siniestro y Trámite por Fallecimiento ante la Aseguradora de Vida","enlace":""},{"nombre":"Expresar tu voluntad hacia la donación","enlace":""},{"nombre":"Habilitación de Servicios Médicos de Emergencias mediante Unidades Móviles","enlace":""},{"nombre":"Habilitación de Servicios Privados de Traslado de Bajo Riesgo","enlace":""},{"nombre":"Solicitud de Autorización para la Instalación de Botiquín Farmacéutico","enlace":""},{"nombre":"Solicitud de Certificado de Ética","enlace":""},{"nombre":"Solicitud de Certificado para IOSCOR","enlace":""},{"nombre":"Solicitud de Certificado para Reconocimientos Médicos","enlace":""},{"nombre":"Solicitud de Constancia de ART","enlace":""},{"nombre":"Solicitud de Constancia de Trabajo","enlace":""},{"nombre":"Solicitud del Pago del Artículo 52 de la Ley 4.067 de la Provincia de Corrientes","enlace":""},{"nombre":"📅 Turnos online","enlace":"https://saludcorrientes.gob.ar/w/turnos/"}] },
+  { id: 3, nombre: "Ministerio de Hacienda y Finanzas", tipo: "Ministerio", tieneWeb: "Si", enlacePortal: "https://www.cgpcorrientes.gob.ar/", enlacePropio: "", ultimaAct: "2026-05-05", estado: "Activo", guia: "No tiene", tramitesOnline: "No tiene", turnos: "No tiene", atencionDig: "Tiene", seguimiento: "No tiene", ia: "No", chatbot: "Si", ministro: "Héctor Ricardo Grachot", dir: "25 de Mayo 902 1° Piso", tel: "(0379) 4476552", mail: "info@cgpcorrientes.gob.ar", dependencias: ["Contaduría General de la Provincia","Tesorería General","Dirección de Presupuesto","Dirección de Rentas"], tramites: [{"nombre":"Certificación de Firma de Intendentes y Viceintendentes para Renovación de Licencia de Conducir","enlace":""},{"nombre":"Acceso a Becas, Subsidios y Asistencia Técnica de Organismos Nacionales e Internacionales","enlace":""},{"nombre":"Solicitud de Ayuda Social para Personas Físicas","enlace":""},{"nombre":"Ayuda Social para Instituciones","enlace":""},{"nombre":"Solicitud de Apoyo Económico para Organizaciones de la Sociedad Civil","enlace":""},{"nombre":"Asistencia y Acompañamiento a Instituciones de Bien Público y Entidades Sociales sin Fines de Lucro","enlace":""}] },
+  { id: 4, nombre: "Ministerio de Seguridad", tipo: "Ministerio", tieneWeb: "Si", enlacePortal: "https://www.corrientes.gob.ar/seguridad", enlacePropio: "", ultimaAct: "2026", estado: "Activo", guia: "Tiene", tramitesOnline: "Solo algunos", turnos: "No tiene", atencionDig: "No tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "Héctor Ricardo Grachot", dir: "Salta 511", tel: "379 4437974", mail: "—", dependencias: ["Jefatura de Policía","Jefatura del Servicio Penitenciario","Subsecretaría de Seguridad","Dirección de Defensa Civil","Dir. de Deudores Alimentarios Morosos"], tramites: [] },
+  { id: 5, nombre: "Ministerio de Desarrollo Social", tipo: "Ministerio", tieneWeb: "Si", enlacePortal: "https://www.corrientes.gob.ar/desarrollosocial", enlacePropio: "", ultimaAct: "2026-01-01", estado: "Activo", guia: "No tiene", tramitesOnline: "No tiene", turnos: "No tiene", atencionDig: "No tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "Dr. José Miguel Ángel Irigoyen", dir: "Murcia 59", tel: "379 4484792", mail: "—", dependencias: ["Secretaría de Desarrollo Humano e Igualdad","Secretaría de Deportes","Subsecretaría de Políticas Sociales Rurales","Consejo Provincial de la Mujer","Dirección de Diversidad de Género"], tramites: [{"nombre":"Reconocimiento de Pasajes","enlace":"https://docs.google.com/document/d/1a5YITyGoxL2dt3fWnZeo0CECE0XYiuz8/edit#bookmark=id.z7wrd7sefxlv"},{"nombre":"Asistencia con Recursos Varios por Vulnerabilidad Social","enlace":"https://docs.google.com/document/d/1a5YITyGoxL2dt3fWnZeo0CECE0XYiuz8/edit#bookmark=id.wr76n0hk0f2p"},{"nombre":"Asistencia por Emergencia Climática (DPINC)","enlace":"https://docs.google.com/document/d/1a5YITyGoxL2dt3fWnZeo0CECE0XYiuz8/edit#bookmark=id.ltvilclmfwsd"},{"nombre":"Solicitud de Cambio Registral de Género — Dirección de Diversidad de Género","enlace":"https://docs.google.com/document/d/1a5YITyGoxL2dt3fWnZeo0CECE0XYiuz8/edit#bookmark=id.7vrfuyue5y13"},{"nombre":"Acompañamiento Legal, Social y Psicológico — Diversidad de Género","enlace":"https://docs.google.com/document/d/1a5YITyGoxL2dt3fWnZeo0CECE0XYiuz8/edit#bookmark=id.m2ysjurdbcvz"},{"nombre":"Solicitud de Inclusión Laboral — Diversidad de Género","enlace":"https://docs.google.com/document/d/1a5YITyGoxL2dt3fWnZeo0CECE0XYiuz8/edit#bookmark=id.43oeld2jovx"},{"nombre":"Consulta y Asesoramiento Primera Vez — Consejo Provincial de la Mujer","enlace":"https://docs.google.com/document/d/1a5YITyGoxL2dt3fWnZeo0CECE0XYiuz8/edit#bookmark=id.wx767xy88hlv"},{"nombre":"Cambio de Turno Tratamiento Psicológico — Consejo Provincial de la Mujer","enlace":"https://docs.google.com/document/d/1a5YITyGoxL2dt3fWnZeo0CECE0XYiuz8/edit#bookmark=id.mop8j1g12oq8"},{"nombre":"Pedido de Capacitaciones — Consejo Provincial de la Mujer","enlace":"https://docs.google.com/document/d/1a5YITyGoxL2dt3fWnZeo0CECE0XYiuz8/edit#bookmark=id.y4vzgbae7d3m"}] },
+  { id: 6, nombre: "Ministerio de Justicia y DDHH", tipo: "Ministerio", tieneWeb: "Si", enlacePortal: "", enlacePropio: "https://minjus.corrientes.gob.ar/", ultimaAct: "—", estado: "No identificado", guia: "No tiene", tramitesOnline: "No tiene", turnos: "No tiene", atencionDig: "No tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "Héctor Ricardo Grachot", dir: "25 de Mayo 902 1° Piso", tel: "(0379) 4476552", mail: "info@cgpcorrientes.gob.ar", dependencias: [], tramites: [] },
+  { id: 7, nombre: "Ministerio de Producción", tipo: "Ministerio", tieneWeb: "Si", enlacePortal: "https://www.corrientes.gob.ar/produccion", enlacePropio: "", ultimaAct: "2026-05-01", estado: "Activo", guia: "Tiene", tramitesOnline: "Solo algunos", turnos: "No tiene", atencionDig: "Tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "Esc. Walter Andrés Chavez", dir: "San Martín 2224", tel: "379 4476034", mail: "privada@mptt.gov.ar", dependencias: ["Secretaría de Agricultura y Ganadería","Secretaría de Desarrollo Foresto Industrial","Subsecretaría de Producción","Instituto de Fomento Empresarial - Corrientes Exporta"], tramites: [{"nombre":"Apicultura","enlace":""},{"nombre":"Inseminación Artificial","enlace":""},{"nombre":"Instructivo permiso de Quemas online","enlace":""},{"nombre":"Plan Láctícola","enlace":""},{"nombre":"Plan Naranja","enlace":""},{"nombre":"Plan Pasturas","enlace":""},{"nombre":"Plan Pecán","enlace":""},{"nombre":"Regularización Dominal","enlace":""}] },
+  { id: 8, nombre: "Ministerio de Industria, Trabajo y Comercio", tipo: "Ministerio", tieneWeb: "Si", enlacePortal: "https://www.corrientes.gob.ar/ministerio-de-industria-trabajo-y-comercio", enlacePropio: "", ultimaAct: "2026", estado: "Activo", guia: "No tiene", tramitesOnline: "No tiene", turnos: "No tiene", atencionDig: "No tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "Dra. Herminda María Gabur", dir: "Pasaje Artigas 690", tel: "—", mail: "—", dependencias: ["Subsecretaría de Industria","Dirección de Comercio","Dirección de Defensa del Consumidor","Subsecretaría de Empleo","Secretaría de Trabajo"], tramites: [] },
+  { id: 9, nombre: "Ministerio de Obras y Servicios Públicos", tipo: "Ministerio", tieneWeb: "Si", enlacePortal: "https://www.corrientes.gob.ar/obras-publicas", enlacePropio: "https://www.dpo.gob.ar/", ultimaAct: "2026-02-02", estado: "Activo", guia: "No tiene", tramitesOnline: "No tiene", turnos: "No tiene", atencionDig: "Tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "Dr. Jorge Omar Meza", dir: "25 de Mayo 888", tel: "3794 262049", mail: "moysp@corrientes.gov.ar", dependencias: ["Subsecretaría de Obras y Servicios Públicos","Subsecretaría de Entes Descentralizados","Dir. de Registro de Constructores","Dir. de Transporte Terrestre","Dir. de Transporte Fluvial y Puertos"], tramites: [] },
+  { id: 10, nombre: "Ministerio de Turismo", tipo: "Ministerio", tieneWeb: "Si", enlacePortal: "", enlacePropio: "https://corrientes.tur.ar", ultimaAct: "2026-04-01", estado: "Activo", guia: "No tiene", tramitesOnline: "Solo algunos", turnos: "No tiene", atencionDig: "Tiene", seguimiento: "No tiene", ia: "No", chatbot: "Si", ministro: "Juan Enrique Braillard Poccard", dir: "25 de Mayo 1330", tel: "+54 9 3795 59-0040", mail: "serviciosturisticosturismo@gmail.com", dependencias: [], tramites: [{"nombre":"🎣 Licencias de Pesca y Caza","enlace":""},{"nombre":"🏨 Prestadores Turísticos","enlace":""}] },
+  { id: 11, nombre: "Ministerio de Coordinación y Planificación", tipo: "Ministerio", tieneWeb: "Si", enlacePortal: "https://www.corrientes.gob.ar/ministerio-de-coordinacion-y-planificacion", enlacePropio: "", ultimaAct: "2026", estado: "Activo", guia: "No tiene", tramitesOnline: "No tiene", turnos: "No tiene", atencionDig: "No tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "Dr. Carlos José Vignolo", dir: "25 de Mayo 927", tel: "379 4475417", mail: "—", dependencias: ["Secretaría de Coordinación y Planificación","Subsecretaría de Modernización del Estado","Red de Municipios Correntinos","Plan Más Vida","Programa Vos Podés"], tramites: [{"nombre":"Certificación de Firma de Intendentes y Viceintendentes para Renovación de Licencia de Conducir","enlace":""},{"nombre":"Acceso a Becas, Subsidios y Asistencia Técnica de Organismos Nacionales e Internacionales","enlace":""},{"nombre":"Solicitud de Ayuda Social para Personas Físicas","enlace":""},{"nombre":"Ayuda Social para Instituciones","enlace":""},{"nombre":"Solicitud de Apoyo Económico para Organizaciones de la Sociedad Civil","enlace":""},{"nombre":"Asistencia y Acompañamiento a Instituciones de Bien Público y Entidades Sociales sin Fines de Lucro","enlace":""}] },
+  { id: 12, nombre: "Ministerio Secretaría General de la Gobernación", tipo: "Ministerio", tieneWeb: "Si", enlacePortal: "https://www.corrientes.gob.ar/ministerio-secretaria-general", enlacePropio: "", ultimaAct: "2026", estado: "Activo", guia: "No tiene", tramitesOnline: "No tiene", turnos: "No tiene", atencionDig: "No tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "Lic. Juan Pablo Fornaroli", dir: "25 de Mayo 927", tel: "379 4475426", mail: "—", dependencias: ["Subsecretaría General de la Gobernación","Dirección Provincial de Aeronáutica","Escribanía de Gobierno","Subsecretaría de Contenidos e Innovación Digital","Casa de Corrientes en Buenos Aires"], tramites: [] },
+  { id: 13, nombre: "DPEC", tipo: "Ente Autárquico", tieneWeb: "Si", enlacePortal: "", enlacePropio: "https://www.dpec.com.ar", ultimaAct: "2026-06-05", estado: "Activo", guia: "Tiene", tramitesOnline: "Tiene", turnos: "Tiene", atencionDig: "Tiene", seguimiento: "Tiene", ia: "No", chatbot: "Si", ministro: "—", dir: "—", tel: "—", mail: "—", dependencias: [], tramites: [] },
+  { id: 14, nombre: "IOSCOR", tipo: "Ente Autárquico", tieneWeb: "Si", enlacePortal: "", enlacePropio: "https://ioscor.gob.ar/", ultimaAct: "2025-05-06", estado: "Activo", guia: "Tiene", tramitesOnline: "Tiene", turnos: "No tiene", atencionDig: "Tiene", seguimiento: "Tiene", ia: "No", chatbot: "No", ministro: "—", dir: "—", tel: "—", mail: "—", dependencias: [], tramites: [] },
+  { id: 15, nombre: "INVICO", tipo: "Ente Autárquico", tieneWeb: "Si", enlacePortal: "", enlacePropio: "https://www.invico.gov.ar/", ultimaAct: "2026-05-01", estado: "Activo", guia: "Tiene", tramitesOnline: "Tiene", turnos: "Tiene", atencionDig: "Tiene", seguimiento: "Tiene", ia: "No", chatbot: "Si", ministro: "—", dir: "—", tel: "—", mail: "—", dependencias: [], tramites: [{"nombre":"Pago de cuotas online","enlace":""}] },
+  { id: 16, nombre: "Instituto de Previsión Social (IPS)", tipo: "Ente Autárquico", tieneWeb: "Si", enlacePortal: "", enlacePropio: "https://www.ipscorrientes.gob.ar/", ultimaAct: "2026-06-01", estado: "Activo", guia: "Tiene", tramitesOnline: "Tiene", turnos: "Tiene", atencionDig: "Tiene", seguimiento: "Tiene", ia: "No", chatbot: "No", ministro: "—", dir: "—", tel: "—", mail: "—", dependencias: ["Delegaciones provinciales (ver web)"], tramites: [{"nombre":"Recibo de Sueldo Digital","enlace":""},{"nombre":"Gestión de Jubilaciones","enlace":""}] },
+  { id: 17, nombre: "Instituto de Cultura", tipo: "Ente Autárquico", tieneWeb: "Si", enlacePortal: "", enlacePropio: "https://culturacorrientes.com/", ultimaAct: "2026-06-10", estado: "Activo", guia: "No tiene", tramitesOnline: "No tiene", turnos: "No tiene", atencionDig: "Tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "—", dir: "—", tel: "—", mail: "—", dependencias: [], tramites: [] },
+  { id: 18, nombre: "Lotería Correntina", tipo: "Ente Autárquico", tieneWeb: "Si", enlacePortal: "", enlacePropio: "https://www.loteriacorrentina.gob.ar/", ultimaAct: "2026-06-08", estado: "Activo", guia: "No tiene", tramitesOnline: "No tiene", turnos: "No tiene", atencionDig: "Tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "—", dir: "—", tel: "—", mail: "—", dependencias: [], tramites: [{"nombre":"Denuncia de Juegos (formulario Google)","enlace":""}] },
+  { id: 19, nombre: "Ente Regulador de Obras Sanitarias AOSC", tipo: "Ente Autárquico", tieneWeb: "Si", enlacePortal: "", enlacePropio: "https://aosc.gob.ar/", ultimaAct: "2026", estado: "Activo", guia: "Tiene", tramitesOnline: "No tiene", turnos: "No tiene", atencionDig: "Tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "—", dir: "—", tel: "—", mail: "—", dependencias: [], tramites: [] },
+  { id: 20, nombre: "Vialidad Provincial", tipo: "Ente Autárquico", tieneWeb: "Si", enlacePortal: "https://www.corrientes.gob.ar/dpv", enlacePropio: "", ultimaAct: "2025-11-01", estado: "Activo", guia: "Tiene", tramitesOnline: "No tiene", turnos: "No tiene", atencionDig: "Tiene", seguimiento: "No tiene", ia: "No", chatbot: "No", ministro: "—", dir: "—", tel: "—", mail: "—", dependencias: [], tramites: [] }
+];
+
+
+const MUNICIPIOS = [
+  { nombre: "Corrientes Capital", tieneWeb: "Sí", estado: "Activa", link: "https://ciudaddecorrientes.gov.ar/", guia: "Sí", tramites: "Parcial", turnos: "Sí", atencion: "Sí", seguimiento: "Parcial", chatbot: "Si", nivel: "Alto", instagram: "https://www.instagram.com/municorrientes" },
+  { nombre: "Goya", tieneWeb: "Sí", estado: "Activa", link: "https://www.goya.gob.ar/", guia: "Parcial", tramites: "Parcial", turnos: "Parcial", atencion: "Sí", seguimiento: "No", chatbot: "No", nivel: "Medio", instagram: "https://www.instagram.com/goyamunicipio/" },
+  { nombre: "Paso de los Libres", tieneWeb: "Sí", estado: "Activa", link: "https://pasodeloslibres.gob.ar/", guia: "No", tramites: "Parcial", turnos: "No", atencion: "Sí", seguimiento: "No", chatbot: "No", nivel: "Medio", instagram: "https://www.instagram.com/pasodeloslibres.gob.ar" },
+  { nombre: "Mercedes", tieneWeb: "No", estado: "—", link: "", guia: "No", tramites: "No", turnos: "No", atencion: "Sí", seguimiento: "No", chatbot: "No", nivel: "Bajo", instagram: "https://www.instagram.com/mercedesmuni" },
+  { nombre: "Curuzú Cuatiá", tieneWeb: "Sí", estado: "Activa", link: "https://curuzu.gob.ar/", guia: "Parcial", tramites: "Parcial", turnos: "No", atencion: "Sí", seguimiento: "No", chatbot: "No", nivel: "Medio", instagram: "https://www.instagram.com/curuzu_muni" },
+  { nombre: "Santo Tomé", tieneWeb: "Sí", estado: "Activa", link: "https://municipiosantotome.gob.ar/", guia: "Parcial", tramites: "No", turnos: "No", atencion: "Sí", seguimiento: "No", chatbot: "No", nivel: "Bajo", instagram: "https://www.instagram.com/santotomeciudad" },
+  { nombre: "Ituzaingó", tieneWeb: "Sí", estado: "Activa", link: "https://www.ituzaingo.gob.ar/", guia: "Parcial", tramites: "No", turnos: "No", atencion: "Sí", seguimiento: "No", chatbot: "No", nivel: "Medio", instagram: "https://www.instagram.com/itugobierno" },
+  { nombre: "Bella Vista", tieneWeb: "Sí", estado: "Activa", link: "https://www.bellavista.gob.ar/", guia: "No", tramites: "Parcial", turnos: "No", atencion: "Sí", seguimiento: "No", chatbot: "No", nivel: "Bajo", instagram: "https://www.instagram.com/bellavistamuni" },
+  { nombre: "Esquina", tieneWeb: "Sí", estado: "Activa", link: "https://2025.esquinacorrientes.gob.ar/", guia: "No", tramites: "No", turnos: "No", atencion: "Sí", seguimiento: "No", chatbot: "No", nivel: "Bajo", instagram: "https://www.instagram.com/gobiernodeesquina" },
+  { nombre: "Monte Caseros", tieneWeb: "Sí", estado: "Activa", link: "https://www.montecaseros.gob.ar/", guia: "Parcial", tramites: "Parcial", turnos: "No", atencion: "Sí", seguimiento: "No", chatbot: "No", nivel: "Medio", instagram: "https://www.instagram.com/munimontecaseros" },
+  { nombre: "Alvear", tieneWeb: "No", estado: "—", link: "", guia: "No", tramites: "No", turnos: "No", atencion: "Sí", seguimiento: "No", chatbot: "No", nivel: "Bajo", instagram: "https://www.instagram.com/municipalidadalvear" },
+  { nombre: "Berón de Astrada", tieneWeb: "No", estado: "—", link: "", guia: "No", tramites: "No", turnos: "No", atencion: "No", seguimiento: "No", chatbot: "No", nivel: "Bajo", instagram: "" },
+  { nombre: "Bonpland", tieneWeb: "No", estado: "—", link: "", guia: "No", tramites: "No", turnos: "No", atencion: "Sí", seguimiento: "No", chatbot: "No", nivel: "Bajo", instagram: "" },
+  { nombre: "Caá Catí", tieneWeb: "Sí", estado: "Activa", link: "https://www.caacati.gob.ar/", guia: "Parcial", tramites: "Parcial", turnos: "No", atencion: "Si", seguimiento: "No", chatbot: "No", nivel: "Medio", instagram: "https://www.instagram.com/caacatigob" },
+];
+
+const PLATAFORMAS = [
+  { org: "IPS", desc: "Recibo de sueldo y trámites jubilatorios", link: "https://recibodigital.ipscor.gob.ar/register", obs: "—", conexion: "—" },
+  { org: "Registro Civil", desc: "Sacar turnos y obtener actas online", link: "https://www.registrocivilctes.gob.ar/Autogestion", obs: "—", conexion: "—" },
+  { org: "INVICO", desc: "Pago de cuotas de vivienda", link: "—", obs: "Puede entrar trámites en MI", conexion: "—" },
+  { org: "Recibo de Sueldo (Emp. Públicos)", desc: "Recibo de haberes para empleados provinciales", link: "https://recibodigital.corrientes.gob.ar/users/sign_in", obs: "—", conexion: "—" },
+  { org: "Lotería Correntina", desc: "Denuncia de juegos clandestinos (Google Form)", link: "https://www.loteriacorrentina.gob.ar/denuncias", obs: "Puede entrar en MI", conexion: "—" },
+  { org: "Dir. Recursos Forestales", desc: "Aviso de quema de campo", link: "https://quemascontroladas.com.ar/planes/create", obs: "Puede entrar en MI", conexion: "Min. Producción" },
+  { org: "Defensor del Pueblo", desc: "Formulario de denuncia online", link: "http://www.eldefensordelpueblo.gov.ar/denuncias-quejas-inquietudes/", obs: "Puede entrar en MI", conexion: "—" },
+  { org: "Fiscalía de Estado", desc: "2 trámites con descarga de PDF", link: "https://www.corrientes.gob.ar/fiscalia-de-estado", obs: "Puede entrar en MI", conexion: "—" },
+  { org: "IGPJ", desc: "Inscripción de SAS (Sociedad por Acciones Simplificada)", link: "https://sas.igpj.ar/", obs: "—", conexion: "—" },
+  { org: "Ministerio de Trabajo", desc: "Rúbrica Digital de documentación laboral", link: "https://rubricadigital.corrientes.gob.ar/", obs: "—", conexion: "—" },
+  { org: "Min. de Coordinación", desc: "Certificación de Firma de Intendentes para Licencia de Conducir", link: "—", obs: "Requiere integración — a resolver", conexion: "—" },
+];
+
+// ===================== RENDER =====================
+let expandedRows = {};
+
+function chIcon(val) {
+  const v = (val||'').toLowerCase();
+  if (v === 'tiene' || v === 'sí' || v === 'si' || v === 'yes') return `<span class="ch-icon ch-on" title="${val}"><i class="fas fa-check"></i></span>`;
+  if (v === 'solo algunos' || v === 'parcial') return `<span class="ch-icon ch-partial" title="${val}"><i class="fas fa-circle-half-stroke"></i></span>`;
+  return `<span class="ch-icon ch-off" title="No tiene"><i class="fas fa-minus"></i></span>`;
+}
+
+function stateBadge(estado) {
+  if (!estado || estado === '—') return `<span class="badge badge-gray">—</span>`;
+  if (estado === 'Activo') return `<span class="badge badge-green"><i class="fas fa-circle" style="font-size:7px;"></i> Activo</span>`;
+  if (estado === 'No identificado') return `<span class="badge badge-yellow"><i class="fas fa-question-circle"></i> No ident.</span>`;
+  return `<span class="badge badge-gray">${estado}</span>`;
+}
+
+function renderMinisterios(data) {
+  const tbody = document.getElementById('ministerios-tbody');
+  tbody.innerHTML = '';
+  if (data.length === 0) {
+    document.getElementById('no-results').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('no-results').classList.add('hidden');
+
+  data.forEach(org => {
+    const hasDetail = org.ministro || org.dependencias.length || org.tramites.length;
+    const webUrl = org.enlacePropio || org.enlacePortal;
+    const webLabel = org.enlacePropio ? 'Web Propia' : (org.enlacePortal ? 'Portal' : '—');
+    const isOpen = expandedRows[org.id];
+
+    const row = document.createElement('tr');
+    row.id = `row-${org.id}`;
+    row.className = isOpen ? 'expanded' : '';
+    row.onclick = () => toggleExpand(org.id);
+    row.innerHTML = `
+      <td><i class="fas fa-chevron-right" id="chevron-${org.id}" style="color: var(--verde); font-size: 10px; transition: transform 0.2s; ${isOpen ? 'transform: rotate(90deg);' : ''}"></i></td>
+      <td>
+        <div style="font-weight: 600; font-size: 13px; color: var(--slate);">${org.nombre}</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">${org.tipo}</div>
+      </td>
+      <td><span class="badge ${org.tipo === 'Ministerio' ? 'badge-blue' : 'badge-gray'}">${org.tipo}</span></td>
+      <td>
+        ${webUrl ? `<a href="${webUrl}" target="_blank" onclick="event.stopPropagation()" style="color: var(--verde); font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px;" title="${webUrl}"><i class="fas fa-arrow-up-right-from-square"></i> ${webLabel}</a>` : '<span style="color:#cbd5e1; font-size:12px;">Sin web</span>'}
+      </td>
+      <td style="font-size: 12px; color: var(--slate-mid); white-space: nowrap;">${org.ultimaAct && org.ultimaAct !== '—' ? org.ultimaAct.slice(0,10) : '—'}</td>
+      <td>${stateBadge(org.estado)}</td>
+      <td style="text-align:center;">${chIcon(org.guia)}</td>
+      <td style="text-align:center;">${chIcon(org.tramitesOnline)}</td>
+      <td style="text-align:center;">${chIcon(org.turnos)}</td>
+      <td style="text-align:center;">${chIcon(org.atencionDig)}</td>
+      <td style="text-align:center;">${chIcon(org.seguimiento)}</td>
+      <td style="text-align:center;">
+        ${org.chatbot === 'Si' ? '<span class="badge badge-green"><i class="fas fa-robot"></i> Sí</span>' : '<span class="badge badge-gray"><i class="fas fa-robot"></i> No</span>'}
+      </td>
+      <td>
+        <div style="display:flex; gap:6px;">
+          ${org.enlacePortal ? `<a href="${org.enlacePortal}" target="_blank" onclick="event.stopPropagation()" class="btn-secondary" style="font-size:11px; padding:4px 10px;"><i class="fas fa-globe"></i></a>` : ''}
+          ${org.enlacePropio ? `<a href="${org.enlacePropio}" target="_blank" onclick="event.stopPropagation()" class="btn-secondary" style="font-size:11px; padding:4px 10px;"><i class="fas fa-external-link-alt"></i></a>` : ''}
+        </div>
+      </td>
+    `;
+    tbody.appendChild(row);
+
+    // Expand row
+    const expandTr = document.createElement('tr');
+    expandTr.className = `expand-row${isOpen ? ' open' : ''}`;
+    expandTr.id = `expand-${org.id}`;
+    expandTr.innerHTML = `
+      <td colspan="13" style="padding: 0 16px 16px 16px; background: #f8fafc;">
+        <div class="expand-panel">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+            <div>
+              <div class="preview-label" style="margin-bottom: 6px;">Autoridad</div>
+              <div style="font-weight: 600; font-size: 14px;">${org.ministro || '—'}</div>
+            </div>
+            <div>
+              <div class="preview-label" style="margin-bottom: 6px;">Contacto</div>
+              <div style="font-size: 13px; color: var(--slate-mid);">📍 ${org.dir || '—'}</div>
+              <div style="font-size: 13px; color: var(--slate-mid);">📞 ${org.tel || '—'}</div>
+              <div style="font-size: 13px; color: var(--slate-mid);">✉️ ${org.mail || '—'}</div>
+            </div>
+            ${org.dependencias.length ? `
+            <div>
+              <div class="preview-label" style="margin-bottom: 6px;">Dependencias (${org.dependencias.length})</div>
+              <ul style="margin: 0; padding-left: 16px; font-size: 12px; color: var(--slate-mid);">
+                ${org.dependencias.map(d => `<li style="margin-bottom: 3px;">${d}</li>`).join('')}
+              </ul>
+            </div>` : ''}
+            ${org.tramites.length ? `
+            <div>
+              <div class="preview-label" style="margin-bottom: 6px;">Trámites Identificados (${org.tramites.length})</div>
+              <ul style="margin: 0; padding-left: 0; list-style: none; font-size: 12px;">
+                ${org.tramites.map(tr => {
+                  const nombre = typeof tr === 'string' ? tr : tr.nombre;
+                  const enlace = typeof tr === 'object' ? tr.enlace : '';
+                  return enlace
+                    ? `<li style="margin-bottom: 6px; display:flex; align-items:flex-start; gap:6px;">
+                         <i class="fas fa-arrow-up-right-from-square" style="color:var(--verde); font-size:10px; margin-top:2px; flex-shrink:0;"></i>
+                         <a href="${enlace}" target="_blank" onclick="event.stopPropagation()"
+                            style="color:var(--verde); text-decoration:none; line-height:1.4;"
+                            onmouseover="this.style.textDecoration='underline'"
+                            onmouseout="this.style.textDecoration='none'">${nombre}</a>
+                       </li>`
+                    : `<li style="margin-bottom: 6px; display:flex; align-items:flex-start; gap:6px;">
+                         <i class="fas fa-circle" style="color:#cbd5e1; font-size:6px; margin-top:4px; flex-shrink:0;"></i>
+                         <span style="color:var(--slate-mid);">${nombre}</span>
+                       </li>`;
+                }).join('')}
+              </ul>
+            </div>` : ''}
+          </div>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(expandTr);
+  });
+}
+
+function toggleExpand(id) {
+  expandedRows[id] = !expandedRows[id];
+  const expandRow = document.getElementById(`expand-${id}`);
+  const mainRow = document.getElementById(`row-${id}`);
+  const chevron = document.getElementById(`chevron-${id}`);
+  if (expandedRows[id]) {
+    expandRow.classList.add('open');
+    mainRow.classList.add('expanded');
+    chevron.style.transform = 'rotate(90deg)';
+  } else {
+    expandRow.classList.remove('open');
+    mainRow.classList.remove('expanded');
+    chevron.style.transform = '';
+  }
+}
+
+function renderMunicipios() {
+  const tbody = document.getElementById('municipios-tbody');
+  MUNICIPIOS.forEach(m => {
+    const row = document.createElement('tr');
+    const levelClass = m.nivel === 'Alto' ? 'level-alto' : (m.nivel === 'Medio' ? 'level-medio' : 'level-bajo');
+    row.innerHTML = `
+      <td>
+        <div style="font-weight: 600; font-size: 13px;">${m.nombre}</div>
+      </td>
+      <td>
+        ${m.tieneWeb === 'Sí' ? `<a href="${m.link}" target="_blank" style="color: var(--verde); font-size: 12px; text-decoration: none;"><i class="fas fa-arrow-up-right-from-square"></i> ${m.link ? new URL(m.link).hostname.replace('www.','') : 'Ver'}</a>` : '<span class="badge badge-red">Sin web</span>'}
+      </td>
+      <td>${m.estado !== '—' ? `<span class="badge badge-green"><i class="fas fa-circle" style="font-size:7px;"></i> ${m.estado}</span>` : '<span class="badge badge-gray">N/A</span>'}</td>
+      <td><span class="${levelClass}"><i class="fas fa-signal"></i> ${m.nivel}</span></td>
+      <td style="text-align:center;">${chIcon(m.guia)}</td>
+      <td style="text-align:center;">${chIcon(m.tramites)}</td>
+      <td style="text-align:center;">${chIcon(m.turnos)}</td>
+      <td style="text-align:center;">${chIcon(m.atencion)}</td>
+      <td style="text-align:center;">${chIcon(m.seguimiento)}</td>
+      <td style="text-align:center;">${m.chatbot === 'Si' ? '<span class="badge badge-green"><i class="fas fa-robot"></i> Sí</span>' : '<span class="badge badge-gray"><i class="fas fa-robot"></i> No</span>'}</td>
+      <td>${m.instagram ? `<a href="${m.instagram}" target="_blank" style="color: #e1306c; font-size: 20px;"><i class="fab fa-instagram"></i></a>` : '—'}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+function renderPlataformas() {
+  const tbody = document.getElementById('plataformas-tbody');
+  PLATAFORMAS.forEach(p => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td style="font-weight: 600; font-size: 13px;">${p.org}</td>
+      <td style="font-size: 13px; color: var(--slate-mid);">${p.desc}</td>
+      <td style="font-size: 12px;">${p.obs !== '—' ? `<span class="badge badge-yellow">${p.obs}</span>` : '—'}</td>
+      <td style="font-size: 12px;">${p.conexion !== '—' ? `<span class="badge badge-blue">${p.conexion}</span>` : '—'}</td>
+      <td>${p.link && p.link !== '—' ? `<a href="${p.link}" target="_blank" class="btn-primary" style="font-size: 11px; padding: 5px 12px;"><i class="fas fa-arrow-up-right-from-square"></i> Ver</a>` : '<span style="color:#cbd5e1; font-size: 12px;">Sin enlace</span>'}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+// ===================== FILTER =====================
+function filterTable() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const tipo = document.getElementById('filter-tipo').value;
+  const estado = document.getElementById('filter-estado').value;
+  const chatbot = document.getElementById('filter-chatbot').value;
+  const filtered = MINISTERIOS.filter(o => {
+    if (q && !o.nombre.toLowerCase().includes(q)) return false;
+    if (tipo && o.tipo !== tipo) return false;
+    if (estado && o.estado !== estado) return false;
+    if (chatbot && o.chatbot !== chatbot) return false;
+    return true;
+  });
+  renderMinisterios(filtered);
+}
+
+function resetFilters() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('filter-tipo').value = '';
+  document.getElementById('filter-estado').value = '';
+  document.getElementById('filter-chatbot').value = '';
+  renderMinisterios(MINISTERIOS);
+}
+
+// ===================== TABS =====================
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active');
+      b.querySelector('i').style.color = '#94a3b8';
+    });
+    btn.classList.add('active');
+    btn.querySelector('i').style.color = 'var(--verde)';
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+  });
+});
+
+document.querySelectorAll('.subtab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.subtab-content').forEach(c => {
+      c.classList.add('hidden');
+      c.classList.remove('active');
+    });
+    const target = document.getElementById(`subtab-${btn.dataset.subtab}`);
+    target.classList.remove('hidden');
+    target.classList.add('active');
+    // Reset filters visibility
+    const filterRow = document.querySelector('.search-wrap').closest('div');
+    if (btn.dataset.subtab === 'ministerios') filterRow.style.display = 'flex';
+    else filterRow.style.display = 'none';
+  });
+});
+
+// ===================== PREVIEW =====================
+function updatePreview() {
+  const g = id => document.getElementById(id).value;
+  document.getElementById('prev-nombre').textContent = g('f-nombre') || 'Nombre del Trámite';
+  document.getElementById('prev-organismo').textContent = g('f-organismo') || 'Organismo responsable';
+  document.getElementById('prev-descripcion').textContent = g('f-descripcion') || 'La descripción del trámite aparecerá aquí...';
+  document.getElementById('prev-dirigido').textContent = g('f-dirigido') || '—';
+  document.getElementById('prev-donde').textContent = g('f-donde') || '—';
+  document.getElementById('prev-momento').textContent = g('f-momento') || '—';
+
+  const tipo = g('f-tipo');
+  const tipoBadge = document.getElementById('prev-tipo-badge');
+  tipoBadge.textContent = tipo || 'TIPO';
+
+  const cat = g('f-categoria');
+  const catBadge = document.getElementById('prev-cat-badge');
+  catBadge.textContent = cat ? cat.toUpperCase() : 'CATEGORÍA';
+
+  const costos = g('f-costos');
+  const costosEl = document.getElementById('prev-costos');
+  costosEl.textContent = costos || '—';
+  if (costos === 'Gratuito') costosEl.innerHTML = '<span class="badge badge-green"><i class="fas fa-gift"></i> Gratuito</span>';
+  else if (costos) costosEl.innerHTML = `<span class="badge badge-yellow"><i class="fas fa-coins"></i> ${costos}</span>`;
+
+  const req = g('f-requisitos');
+  document.getElementById('prev-requisitos').innerHTML = req ? req.split('\n').filter(Boolean).map(r => `<div style="padding: 2px 0; font-size: 12px;">• ${r}</div>`).join('') : '—';
+
+  const pasos = g('f-pasos');
+  document.getElementById('prev-pasos').innerHTML = pasos ? pasos.split('\n').filter(Boolean).map((p,i) => `<div style="padding:3px 0; font-size:12px; display:flex; gap:6px; align-items:flex-start;"><span style="min-width:18px; height:18px; background:var(--verde); color:white; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:9px; font-weight:700;">${i+1}</span>${p.replace(/^\d+\.\s*/,'')}</div>`).join('') : '—';
+
+  // Priority badge
+  const prio = g('f-prioridad');
+  const prioBadge = document.getElementById('prev-prioridad-badge');
+  prioBadge.innerHTML = prio ? `<span class="badge ${prio==='Alta'?'badge-red':prio==='Media'?'badge-yellow':'badge-green'}"><i class="fas fa-flag"></i> ${prio}</span>` : '';
+
+  const est = g('f-estado');
+  document.getElementById('prev-estado-badge').innerHTML = est ? `<span class="badge badge-blue">${est}</span>` : '';
+  const temp = g('f-temporalidad');
+  document.getElementById('prev-temp-badge').innerHTML = temp ? `<span class="badge badge-gray"><i class="fas fa-clock"></i> ${temp}</span>` : '';
+
+  // CTA
+  const cta = g('f-cta');
+  const ctaWrap = document.getElementById('prev-cta-wrap');
+  if (cta) {
+    ctaWrap.style.display = 'block';
+    document.getElementById('prev-cta').href = cta;
+  } else {
+    ctaWrap.style.display = 'none';
+  }
+}
+
+// ===================== HISTORY =====================
+// Datos en memoria (se sincronizan con Supabase + localStorage como caché offline)
+let savedTramites = JSON.parse(localStorage.getItem('tramites_corrientes') || '[]');
+let editingId = null; // null = nuevo trámite | number = id del trámite que se está editando
+
+// ── Cargar fichas desde Supabase al iniciar ──────────────────────
+async function loadFromSupabase() {
+  if (!SB_CONFIGURED) return;
+  console.log('[Supabase] Intentando cargar fichas...');
+  try {
+    const { data, error } = await _supabase
+      .from('tramites')
+      .select('*')
+      .order('id', { ascending: false });
+    if (error) {
+      console.error('[Supabase] Error al cargar:', error.code, error.message, error.hint);
+      showToast(`⚠️ Supabase: ${error.message}`, 'warning');
+      return;
+    }
+    savedTramites = (data || []).map(t => ({ ...t, id: Number(t.id) }));
+    localStorage.setItem('tramites_corrientes', JSON.stringify(savedTramites));
+    renderHistory();
+    console.log(`[Supabase] ✅ ${savedTramites.length} fichas cargadas`);
+  } catch (err) {
+    console.error('[Supabase] Error de red:', err);
+    showToast(`⚠️ No se pudo conectar con Supabase.`, 'warning');
+  }
+}
+
+// ── Guardar / Actualizar ficha en Supabase + localStorage ────────
+async function saveTramite() {
+  const g = id => document.getElementById(id).value;
+  if (!g('f-nombre').trim()) { showToast('Por favor ingresá el nombre del trámite.', 'warning'); return; }
+
+  const campos = {
+    nombre:       g('f-nombre'),
+    organismo:    g('f-organismo'),
+    categoria:    g('f-categoria'),
+    tipo:         g('f-tipo'),
+    prioridad:    g('f-prioridad'),
+    estado:       g('f-estado'),
+    fecha:        g('f-fecha') || null,
+    descripcion:  g('f-descripcion'),
+    dirigido:     g('f-dirigido'),
+    requisitos:   g('f-requisitos'),
+    pasos:        g('f-pasos'),
+    costos:       g('f-costos'),
+    donde:        g('f-donde'),
+    cta:          g('f-cta'),
+    notas:        g('f-notas'),
+    responsable:  g('f-responsable'),
+    momento:      g('f-momento'),
+    temporalidad: g('f-temporalidad')
+  };
+
+  const esEdicion = editingId !== null;
+
+  // ── MODO EDICIÓN: actualizar el registro existente ───────────
+  if (esEdicion) {
+    const idx = savedTramites.findIndex(t => t.id === editingId);
+    if (idx !== -1) {
+      savedTramites[idx] = { ...savedTramites[idx], ...campos };
+      localStorage.setItem('tramites_corrientes', JSON.stringify(savedTramites));
+      renderHistory();
+    }
+
+    if (SB_CONFIGURED) {
+      console.log('[Supabase] Actualizando ficha id:', editingId);
+      try {
+        const { error } = await _supabase
+          .from('tramites')
+          .update(campos)
+          .eq('id', editingId);
+        if (error) {
+          console.error('[Supabase] Update error:', error.code, error.message, error.hint);
+          throw error;
+        }
+        showToast(`✅ "${campos.nombre}" actualizada en la base de datos.`);
+      } catch (err) {
+        const msg = err.message || JSON.stringify(err);
+        showToast(`⚠️ Error Supabase: ${msg}`, 'warning');
+      }
+    } else {
+      showToast(`✅ "${campos.nombre}" actualizada (modo local).`);
+    }
+
+    editingId = null;
+    resetSaveButton();
+    return;
+  }
+
+  // ── MODO CREACIÓN: insertar nuevo registro ───────────────────
+  const tramite = { id: Date.now(), ...campos };
+
+  if (!SB_CONFIGURED) {
+    savedTramites.unshift(tramite);
+    localStorage.setItem('tramites_corrientes', JSON.stringify(savedTramites));
+    renderHistory();
+    showToast(`✅ Ficha "${tramite.nombre}" guardada (modo local).`);
+    return;
+  }
+
+  // Con Supabase: insertar primero, guardar local solo si OK (o en fallback)
+  console.log('[Supabase] Insertando ficha:', tramite.nombre);
+  try {
+    const { data, error } = await _supabase
+      .from('tramites')
+      .insert([tramite])
+      .select()
+      .single();
+    if (error) {
+      console.error('[Supabase] Insert error:', error.code, error.message, error.hint, error.details);
+      throw error;
+    }
+    const guardado = { ...data, id: Number(data.id) };
+    savedTramites.unshift(guardado);
+    localStorage.setItem('tramites_corrientes', JSON.stringify(savedTramites));
+    renderHistory();
+    showToast(`✅ "${tramite.nombre}" guardada en Supabase.`);
+  } catch (err) {
+    // Fallback local
+    savedTramites.unshift(tramite);
+    localStorage.setItem('tramites_corrientes', JSON.stringify(savedTramites));
+    renderHistory();
+    const msg = err.message || JSON.stringify(err);
+    showToast(`⚠️ Error Supabase: ${msg}`, 'warning');
+  }
+}
+
+// ── Resetear botón Guardar al estado normal ───────────────────────
+function resetSaveButton() {
+  const btn = document.querySelector('[onclick="saveTramite()"]');
+  if (btn) {
+    btn.innerHTML = '<i class="fas fa-floppy-disk"></i> Guardar Ficha';
+    btn.style.background = '';
+  }
+}
+
+// ── Eliminar ficha en Supabase + localStorage ────────────────────
+async function deleteTramite(id) {
+  savedTramites = savedTramites.filter(t => t.id !== id);
+  localStorage.setItem('tramites_corrientes', JSON.stringify(savedTramites));
+  renderHistory();
+  showToast('Ficha eliminada del historial.', 'warning');
+
+  if (!SB_CONFIGURED) return;
+  try {
+    const { error } = await _supabase.from('tramites').delete().eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    sbError(err, 'eliminar en Supabase');
+  }
+}
+
+function renderHistory() {
+  const tbody = document.getElementById('hist-tbody');
+  const empty = document.getElementById('hist-empty');
+  const wrap = document.getElementById('hist-table-wrap');
+  const count = document.getElementById('hist-count');
+  tbody.innerHTML = '';
+  count.textContent = `${savedTramites.length} fichas`;
+  if (!savedTramites.length) {
+    empty.style.display = 'block';
+    wrap.classList.add('hidden');
+    document.getElementById('hist-filters').style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  wrap.classList.remove('hidden');
+  document.getElementById('hist-filters').style.display = 'flex';
+
+  savedTramites.forEach((t, i) => {
+    const row = document.createElement('tr');
+    // Data attributes para filtros y ordenamiento
+    row.dataset.nombre    = (t.nombre    || '').toLowerCase();
+    row.dataset.organismo = (t.organismo || '').toLowerCase();
+    row.dataset.categoria = t.categoria  || '';
+    row.dataset.tipo      = t.tipo       || '';
+    row.dataset.prioridad = t.prioridad  || '';
+    row.dataset.estado    = t.estado     || '';
+    row.dataset.fecha     = t.fecha      || '';
+    row.dataset.id        = t.id;
+
+    const prioClass = t.prioridad === 'Alta' ? 'priority-alta' : t.prioridad === 'Media' ? 'priority-media' : 'priority-baja';
+    row.innerHTML = `
+      <td style="color:#94a3b8; font-size:12px;">${i+1}</td>
+      <td style="font-weight:600; font-size:13px;">${t.nombre||'—'}</td>
+      <td style="font-size:12px; color:var(--slate-mid);">${t.organismo||'—'}</td>
+      <td>${t.categoria ? `<span class="badge badge-blue">${t.categoria}</span>` : '—'}</td>
+      <td>${t.tipo ? `<span class="badge badge-gray">${t.tipo}</span>` : '—'}</td>
+      <td class="${prioClass}">${t.prioridad||'—'}</td>
+      <td>${t.estado ? `<span class="badge ${t.estado==='Aprobado'?'badge-green':t.estado==='En Revisión'?'badge-yellow':'badge-gray'}">${t.estado}</span>` : '—'}</td>
+      <td style="font-size:12px; color:var(--slate-mid);">${t.fecha||'—'}</td>
+      <td>
+        <div style="display:flex; gap:6px;">
+          <button onclick="openModal(${t.id})" class="btn-primary" style="font-size:11px; padding:4px 12px;" title="Ver ficha"><i class="fas fa-eye"></i> Ver</button>
+          <button onclick="loadTramite(${t.id})" class="btn-secondary" style="font-size:11px; padding:4px 10px;" title="Editar"><i class="fas fa-pen"></i></button>
+          <button onclick="deleteTramite(${t.id})" class="btn-secondary" style="font-size:11px; padding:4px 10px; color:#ef4444;" title="Eliminar"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+function loadTramite(id) {
+  const t = savedTramites.find(x => x.id === id);
+  if (!t) return;
+
+  // Marcar que estamos editando este trámite
+  editingId = t.id;
+
+  const fields = ['nombre','organismo','categoria','tipo','prioridad','estado','fecha','descripcion','dirigido','requisitos','pasos','costos','donde','cta','notas','responsable','momento','temporalidad'];
+  fields.forEach(f => {
+    const el = document.getElementById(`f-${f}`);
+    if (el) el.value = t[f] || '';
+  });
+
+  updatePreview();
+  document.querySelector('[data-tab="tramites"]').click();
+
+  // Cambiar el botón para indicar modo edición
+  const btn = document.querySelector('[onclick="saveTramite()"]');
+  if (btn) {
+    btn.innerHTML = '<i class="fas fa-pen-to-square"></i> Actualizar Ficha';
+    btn.style.background = 'var(--amarillo)';
+    btn.style.color = '#1a1a1a';
+  }
+
+  showToast(`✏️ Editando: "${t.nombre}"`);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ===================== MODAL =====================
+let currentModalId = null;
+
+function openModal(id) {
+  const t = savedTramites.find(x => x.id === id);
+  if (!t) return;
+  currentModalId = id;
+
+  // Header
+  document.getElementById('modal-nombre').textContent = t.nombre || '—';
+  document.getElementById('modal-organismo').textContent = t.organismo || 'Organismo no especificado';
+
+  // Badges
+  const badgesEl = document.getElementById('modal-badges');
+  badgesEl.innerHTML = '';
+  if (t.tipo) badgesEl.innerHTML += `<span style="background:rgba(255,255,255,0.2);color:white;font-size:10px;font-weight:700;padding:3px 12px;border-radius:999px;">${t.tipo.toUpperCase()}</span>`;
+  if (t.categoria) badgesEl.innerHTML += `<span style="background:rgba(255,255,255,0.2);color:white;font-size:10px;font-weight:700;padding:3px 12px;border-radius:999px;">${t.categoria.toUpperCase()}</span>`;
+  if (t.momento) badgesEl.innerHTML += `<span style="background:rgba(255,255,255,0.14);color:rgba(255,255,255,0.8);font-size:10px;font-weight:600;padding:3px 12px;border-radius:999px;"><i class="fas fa-clock" style="margin-right:4px;"></i>${t.momento}</span>`;
+
+  // Meta strip
+  const prioIcon = t.prioridad === 'Alta' ? '🔴' : t.prioridad === 'Media' ? '🟡' : t.prioridad === 'Baja' ? '🟢' : '—';
+  document.getElementById('modal-estado-meta').textContent = t.estado || '—';
+  document.getElementById('modal-prioridad-meta').textContent = t.prioridad ? `${prioIcon} ${t.prioridad}` : '—';
+  document.getElementById('modal-temp-meta').textContent = t.temporalidad || '—';
+  document.getElementById('modal-fecha-meta').textContent = t.fecha || '—';
+  document.getElementById('modal-resp-meta').textContent = t.responsable || '—';
+
+  // Description
+  document.getElementById('modal-descripcion').textContent = t.descripcion || 'Sin descripción cargada.';
+
+  // Info grid
+  document.getElementById('modal-dirigido').textContent = t.dirigido || '—';
+  document.getElementById('modal-momento').textContent = t.momento || '—';
+  const costosEl = document.getElementById('modal-costos');
+  if (t.costos === 'Gratuito') costosEl.innerHTML = '<span class="badge badge-green"><i class="fas fa-gift"></i> Gratuito</span>';
+  else costosEl.textContent = t.costos || '—';
+  document.getElementById('modal-donde').textContent = t.donde || '—';
+
+  // Requisitos
+  const reqSection = document.getElementById('modal-req-section');
+  const reqEl = document.getElementById('modal-requisitos');
+  if (t.requisitos && t.requisitos.trim()) {
+    reqSection.style.display = 'block';
+    reqEl.innerHTML = t.requisitos.split('\n').filter(Boolean).map(r => `<div class="modal-req-item">${r}</div>`).join('');
+  } else { reqSection.style.display = 'none'; }
+
+  // Pasos
+  const pasosSection = document.getElementById('modal-pasos-section');
+  const pasosEl = document.getElementById('modal-pasos');
+  if (t.pasos && t.pasos.trim()) {
+    pasosSection.style.display = 'block';
+    pasosEl.innerHTML = t.pasos.split('\n').filter(Boolean).map((p, i) =>
+      `<div class="modal-step"><span class="modal-step-num">${i+1}</span><span>${p.replace(/^\d+\.\s*/, '')}</span></div>`
+    ).join('');
+  } else { pasosSection.style.display = 'none'; }
+
+  // CTA
+  const ctaSection = document.getElementById('modal-cta-section');
+  if (t.cta) {
+    ctaSection.style.display = 'block';
+    document.getElementById('modal-cta-link').href = t.cta;
+  } else { ctaSection.style.display = 'none'; }
+
+  // Notas
+  const notasSection = document.getElementById('modal-notas-section');
+  if (t.notas && t.notas.trim()) {
+    notasSection.style.display = 'block';
+    document.getElementById('modal-notas').textContent = t.notas;
+  } else { notasSection.style.display = 'none'; }
+
+  document.getElementById('ficha-modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('ficha-modal-overlay')) closeModalDirect();
+}
+function closeModalDirect() {
+  document.getElementById('ficha-modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  currentModalId = null;
+}
+function modalEditAction() {
+  if (currentModalId) { closeModalDirect(); loadTramite(currentModalId); }
+}
+function modalCopyAction() {
+  if (!currentModalId) return;
+  const t = savedTramites.find(x => x.id === currentModalId);
+  if (!t) return;
+  const md = `# ${t.nombre}\n**Organismo:** ${t.organismo||'—'} | **Categoría:** ${t.categoria||'—'} | **Tipo:** ${t.tipo||'—'}\n\n## Descripción\n${t.descripcion||'—'}\n\n## Público Objetivo\n${t.dirigido||'—'}\n\n## Requisitos\n${t.requisitos||'—'}\n\n## Pasos\n${t.pasos||'—'}\n\n## Costos\n${t.costos||'—'}\n\n## Dónde realizarlo\n${t.donde||'—'}\n\n## Enlace de Acción\n${t.cta||'—'}\n\n---\n_Estado: ${t.estado||'—'} · Prioridad: ${t.prioridad||'—'} · Relevado: ${t.fecha||'—'} · Por: ${t.responsable||'—'}_${t.notas?'\n\n**Notas:** '+t.notas:''}`;
+  navigator.clipboard.writeText(md).then(() => showToast('📋 Ficha copiada en Markdown.')).catch(() => showToast('Error al copiar.', 'warning'));
+}
+function modalDeleteAction() {
+  if (!currentModalId) return;
+  const t = savedTramites.find(x => x.id === currentModalId);
+  closeModalDirect();
+  deleteTramite(t.id);
+}
+// Close on ESC
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalDirect(); });
+
+function clearForm() {
+  document.querySelectorAll('#tab-tramites input, #tab-tramites select, #tab-tramites textarea').forEach(el => el.value = '');
+  editingId = null;
+  resetSaveButton();
+  updatePreview();
+}
+
+function copyMarkdown() {
+  const g = id => document.getElementById(id).value;
+  if (!g('f-nombre').trim()) { showToast('Completá al menos el nombre del trámite.', 'warning'); return; }
+  const md = `# ${g('f-nombre')}
+**Organismo:** ${g('f-organismo')||'—'} | **Categoría:** ${g('f-categoria')||'—'} | **Tipo:** ${g('f-tipo')||'—'}
+
+## Descripción
+${g('f-descripcion')||'—'}
+
+## Público Objetivo
+${g('f-dirigido')||'—'}
+
+## Requisitos
+${g('f-requisitos')||'—'}
+
+## Pasos
+${g('f-pasos')||'—'}
+
+## Costos
+${g('f-costos')||'—'}
+
+## Dónde realizarlo
+${g('f-donde')||'—'}
+
+## Enlace de Acción
+${g('f-cta')||'—'}
+
+---
+_Estado: ${g('f-estado')||'—'} · Prioridad: ${g('f-prioridad')||'—'} · Relevado: ${g('f-fecha')||'—'} · Por: ${g('f-responsable')||'—'}_
+${g('f-notas') ? `\n**Notas:** ${g('f-notas')}` : ''}`;
+  navigator.clipboard.writeText(md).then(() => showToast('📋 Ficha copiada en formato Markdown.')).catch(() => showToast('Error al copiar. Intentá de nuevo.', 'warning'));
+}
+
+// ===================== TOAST =====================
+function showToast(msg, type = 'success') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast${type === 'warning' ? ' yellow' : ''}`;
+  const icon = type === 'warning' ? '⚠️' : '✅';
+  toast.innerHTML = `<span style="font-size:18px;">${icon}</span><span>${msg}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(40px)';
+    toast.style.transition = 'all 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 3400);
+}
+
+// ===================== HISTORIAL: FILTROS Y ORDENAMIENTO =====================
+let histSortField = null;
+let histSortAsc   = true;
+
+function applyHistFilters() {
+  const q = {
+    nombre:    (document.getElementById('hf-nombre').value    || '').toLowerCase(),
+    organismo: (document.getElementById('hf-organismo').value || '').toLowerCase(),
+    categoria:  document.getElementById('hf-categoria').value,
+    tipo:       document.getElementById('hf-tipo').value,
+    prioridad:  document.getElementById('hf-prioridad').value,
+    estado:     document.getElementById('hf-estado').value,
+    fecha:      document.getElementById('hf-fecha').value,
+  };
+  const rows = document.querySelectorAll('#hist-tbody tr');
+  let visible = 0;
+  rows.forEach(row => {
+    const d = row.dataset;
+    const match =
+      (!q.nombre    || d.nombre.includes(q.nombre))        &&
+      (!q.organismo || d.organismo.includes(q.organismo))   &&
+      (!q.categoria || d.categoria === q.categoria)          &&
+      (!q.tipo      || d.tipo      === q.tipo)               &&
+      (!q.prioridad || d.prioridad === q.prioridad)          &&
+      (!q.estado    || d.estado    === q.estado)             &&
+      (!q.fecha     || d.fecha     === q.fecha);
+    row.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  document.getElementById('hist-no-results').style.display = visible === 0 ? 'block' : 'none';
+}
+
+function clearHistFilters() {
+  ['hf-nombre','hf-organismo','hf-categoria','hf-tipo','hf-prioridad','hf-estado','hf-fecha']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  applyHistFilters();
+}
+
+const PRIO_ORDER = { Alta: 1, Media: 2, Baja: 3 };
+
+function exportJSON() {
+  if (!savedTramites.length) {
+    showToast('No hay fichas guardadas para exportar.', 'warning');
+    return;
+  }
+  const fecha = new Date().toISOString().slice(0, 10);
+  const filename = `fichas_tramites_corrientes_${fecha}.json`;
+  const data = JSON.stringify(savedTramites, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`📥 ${savedTramites.length} fichas exportadas como "${filename}".`);
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!Array.isArray(parsed)) throw new Error('Formato inválido');
+
+      // Validar que tenga al menos el campo nombre
+      const validos = parsed.filter(t => t && t.nombre);
+      if (!validos.length) throw new Error('Sin fichas válidas');
+
+      // Merge: evitar duplicados por id, los importados ganan
+      const existingIds = new Set(savedTramites.map(t => t.id));
+      let nuevas = 0;
+      let reemplazadas = 0;
+
+      validos.forEach(t => {
+        if (existingIds.has(t.id)) {
+          const idx = savedTramites.findIndex(x => x.id === t.id);
+          savedTramites[idx] = t;
+          reemplazadas++;
+        } else {
+          savedTramites.unshift(t);
+          nuevas++;
+        }
+      });
+
+      localStorage.setItem('tramites_corrientes', JSON.stringify(savedTramites));
+      renderHistory();
+
+      const msg = nuevas && reemplazadas
+        ? `✅ ${nuevas} fichas nuevas importadas, ${reemplazadas} actualizadas.`
+        : nuevas
+          ? `✅ ${nuevas} fichas importadas correctamente.`
+          : `✅ ${reemplazadas} fichas actualizadas desde el archivo.`;
+      showToast(msg);
+
+      // Sincronizar con Supabase
+      if (SB_CONFIGURED) {
+        showToast('⏳ Sincronizando con Supabase...', 'warning');
+        try {
+          const { error } = await _supabase
+            .from('tramites')
+            .upsert(validos, { onConflict: 'id' });
+          if (error) throw error;
+          showToast(`☁️ ${validos.length} fichas sincronizadas en Supabase.`);
+        } catch (err) {
+          showToast(`⚠️ Error al sincronizar con Supabase: ${err.message}`, 'warning');
+        }
+      }
+    } catch (err) {
+      showToast('⚠️ El archivo no es válido. Asegurate de importar un JSON exportado desde esta misma herramienta.', 'warning');
+    }
+    // Reset input para permitir reimportar el mismo archivo
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+
+function sortHist(field) {
+  if (histSortField === field) histSortAsc = !histSortAsc;
+  else { histSortField = field; histSortAsc = true; }
+
+  // Reset todos los íconos
+  ['id','nombre','organismo','categoria','tipo','prioridad','estado','fecha'].forEach(f => {
+    const el = document.getElementById(`sort-icon-${f}`);
+    if (el) { el.className = 'fas fa-sort'; el.style.color = '#94a3b8'; }
+  });
+  const icon = document.getElementById(`sort-icon-${field}`);
+  if (icon) {
+    icon.className = histSortAsc ? 'fas fa-sort-up' : 'fas fa-sort-down';
+    icon.style.color = 'var(--verde)';
+  }
+
+  const tbody = document.getElementById('hist-tbody');
+  const rows  = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a, b) => {
+    if (field === 'prioridad') {
+      const av = PRIO_ORDER[a.dataset.prioridad] || 9;
+      const bv = PRIO_ORDER[b.dataset.prioridad] || 9;
+      return histSortAsc ? av - bv : bv - av;
+    }
+    const av = (a.dataset[field] || '').toLowerCase();
+    const bv = (b.dataset[field] || '').toLowerCase();
+    return histSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// ===================== INIT =====================
+renderMinisterios(MINISTERIOS);
+renderMunicipios();
+renderPlataformas();
+renderHistory();
+loadFromSupabase();       // Sincroniza desde Supabase (async)
+
+// Set today's date
+document.getElementById('f-fecha').value = new Date().toISOString().slice(0,10);
+updatePreview();
+</script>
+</body>
+</html>
