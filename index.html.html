@@ -124,6 +124,64 @@
   .hist-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   .hist-table tr:hover td { background: #f8fafc; }
 
+
+  /* ========== LOGIN OVERLAY ========== */
+  #login-overlay {
+    position: fixed; inset: 0; z-index: 99999;
+    background: linear-gradient(135deg, #0f172a 0%, #0b2a1a 60%, #0f172a 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    transition: opacity 0.4s ease;
+  }
+  #login-overlay.hidden { opacity: 0; pointer-events: none; }
+
+  #login-card {
+    background: white; border-radius: 24px; width: 100%; max-width: 400px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.4);
+    overflow: hidden;
+    transform: translateY(0); transition: transform 0.4s ease;
+  }
+  #login-overlay.hidden #login-card { transform: translateY(20px); }
+
+  #login-header {
+    background: var(--verde); padding: 32px 32px 28px;
+    text-align: center;
+  }
+  #login-body { padding: 32px; }
+
+  #login-input {
+    width: 100%; border: 2px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; font-size: 16px; font-family: 'Inter', sans-serif;
+    color: var(--slate); letter-spacing: 0.1em;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  #login-input:focus { border-color: var(--verde); box-shadow: 0 0 0 4px rgba(14,167,93,0.12); }
+  #login-input.error { border-color: var(--rojo); box-shadow: 0 0 0 4px rgba(239,68,68,0.12); animation: shake 0.35s ease; }
+
+  #login-btn {
+    width: 100%; background: var(--verde); color: white; border: none;
+    border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 700;
+    font-family: 'Poppins', sans-serif; cursor: pointer; margin-top: 14px;
+    transition: background 0.2s, transform 0.1s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  #login-btn:hover { background: var(--verde-dark); }
+  #login-btn:active { transform: scale(0.98); }
+
+  #login-error {
+    color: var(--rojo); font-size: 13px; margin-top: 10px;
+    text-align: center; min-height: 18px; font-weight: 500;
+  }
+
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%      { transform: translateX(-8px); }
+    40%      { transform: translateX(8px); }
+    60%      { transform: translateX(-5px); }
+    80%      { transform: translateX(5px); }
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -188,6 +246,37 @@
 
 <!-- Toast Container -->
 <div id="toast-container"></div>
+
+<!-- ========== LOGIN OVERLAY ========== -->
+<div id="login-overlay">
+  <div id="login-card">
+    <div id="login-header">
+      <div style="width:56px;height:56px;background:rgba(255,255,255,0.2);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+        <i class="fas fa-landmark" style="color:white;font-size:24px;"></i>
+      </div>
+      <div style="color:white;font-family:'Poppins',sans-serif;font-weight:800;font-size:20px;line-height:1.2;margin-bottom:6px;">Portal de Relevamiento</div>
+      <div style="color:rgba(255,255,255,0.7);font-size:12px;letter-spacing:0.06em;">PROVINCIA DE CORRIENTES · ACCESO RESTRINGIDO</div>
+    </div>
+    <div id="login-body">
+      <label style="display:block;font-size:12px;font-weight:700;color:var(--slate-mid);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">
+        <i class="fas fa-lock" style="margin-right:5px;color:var(--verde);"></i>Contraseña de acceso
+      </label>
+      <input
+        type="password"
+        id="login-input"
+        placeholder="Ingresá la contraseña"
+        onkeydown="if(event.key==='Enter') checkPassword()"
+        autocomplete="current-password"
+      >
+      <button id="login-btn" onclick="checkPassword()">
+        <i class="fas fa-arrow-right-to-bracket"></i> Ingresar
+      </button>
+      <div id="login-error"></div>
+    </div>
+  </div>
+</div>
+
+
 
 <!-- Header -->
 <header style="background: var(--slate); border-bottom: 3px solid var(--verde);">
@@ -1652,6 +1741,43 @@ function sortHist(field) {
     return histSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
   });
   rows.forEach(r => tbody.appendChild(r));
+}
+
+
+// ===================== LOGIN =====================
+const ACCESS_PASSWORD = 'C0rr1entes2026';
+const SESSION_KEY     = 'portal_ctes_auth';
+
+function checkPassword() {
+  const input = document.getElementById('login-input');
+  const errorEl = document.getElementById('login-error');
+  const val = input.value;
+
+  if (val === ACCESS_PASSWORD) {
+    sessionStorage.setItem(SESSION_KEY, '1');
+    const overlay = document.getElementById('login-overlay');
+    overlay.classList.add('hidden');
+    setTimeout(() => overlay.remove(), 450);
+  } else {
+    input.classList.remove('error');
+    void input.offsetWidth; // force reflow para reiniciar animación
+    input.classList.add('error');
+    errorEl.textContent = 'Contraseña incorrecta. Intentá de nuevo.';
+    input.value = '';
+    input.focus();
+    setTimeout(() => { input.classList.remove('error'); }, 400);
+  }
+}
+
+// Si ya tiene sesión activa, ocultar overlay sin animación
+if (sessionStorage.getItem(SESSION_KEY) === '1') {
+  document.getElementById('login-overlay').remove();
+} else {
+  // Enfocar el input automáticamente
+  document.addEventListener('DOMContentLoaded', () => {
+    const inp = document.getElementById('login-input');
+    if (inp) inp.focus();
+  });
 }
 
 // ===================== INIT =====================
