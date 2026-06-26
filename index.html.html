@@ -1321,7 +1321,7 @@ async function saveTramite() {
     savedTramites.unshift(guardado);
     localStorage.setItem('tramites_corrientes', JSON.stringify(savedTramites));
     renderHistory();
-    showToast(`✅ "${tramite.nombre}" guardada en Supabase.`);
+    showToast(`✅ "${tramite.nombre}" guardada en la base de datos.`);
   } catch (err) {
     // Fallback local
     savedTramites.unshift(tramite);
@@ -1698,7 +1698,7 @@ function importJSON(event) {
             .from('tramites')
             .upsert(validos, { onConflict: 'id' });
           if (error) throw error;
-          showToast(`☁️ ${validos.length} fichas sincronizadas en Supabase.`);
+          showToast(`☁️ ${validos.length} fichas sincronizadas en la base de datos.`);
         } catch (err) {
           showToast(`⚠️ Error al sincronizar con Supabase: ${err.message}`, 'warning');
         }
